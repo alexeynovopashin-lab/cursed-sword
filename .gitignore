@@ -2,3 +2,5 @@
 node_modules/
 dist/
 *.log
+SESSIONS_CHAT.md
+SESSIONS_CHAT_archive/

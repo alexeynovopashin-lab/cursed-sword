@@ -14,10 +14,15 @@ top. Born 2026-09-26 from speaker tests of `alice_soulledger` (see
 
 ## Start of a session
 
-1. `git log --oneline -20`, then the chat `ws:30_agents/cursed_sword.md`
-   (`grep -n` your signature and «всем», plus `tail -80`).
-2. `README.md` → Status, then headings of `ROADMAP.md` and `DECISIONS.md`;
-   read only the section you need.
+1. `git log --oneline -20`, then the chat `SESSIONS_CHAT.md` (in this folder,
+   not in git; `grep -n` your name and «всем», plus `tail -80`).
+2. `docs/NEXT_SESSION.md` (current state), then your iteration in
+   `ITERATIONS.md`; headings of `DECISIONS.md` and `ROADMAP.md`; read only the
+   section you need.
+
+Work goes in iterations run by an orchestrator, as in Light Plan (Alexey,
+2026-09-27): rules in `ITERATIONS.md`, orchestrator instructions in
+`docs/orchestrator_project_instructions.md`.
 
 ## Documents
 
@@ -25,6 +30,9 @@ top. Born 2026-09-26 from speaker tests of `alice_soulledger` (see
 |---|---|---|
 | `DECISIONS.md` | What Alexey decided, in his words, and why | Append only; record literally, don't extend (ws rule 26) |
 | `ROADMAP.md` | Phases, what is done, what is next, open questions | Keep status current |
+| `ITERATIONS.md` | Iterations and their steps, summaries | Orchestrator plans; threads add «Итог» |
+| `docs/NEXT_SESSION.md` | Current state for a new session | Orchestrator rewrites, ≤ ~100 lines |
+| `SESSIONS_CHAT.md` | Hand-off between live chats (not in git) | Append only, rules at its top |
 | `docs/story/` | Through-line plot, arcs, episodes, characters | Drafts until Alexey approves; mark «черновик» |
 | `docs/ideas/` | Raw ideas and discussions, not decisions | Append; never promote to DECISIONS without Alexey |
 | `docs/mechanics/` | Game systems (combat, abilities, artifacts, maze, party) | Created in phase 2 |

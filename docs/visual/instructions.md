@@ -37,9 +37,10 @@ for the orchestrator.
 
 - All items form one site — «доска сценариста» (Alexey: «как wiki, только
   сложнее»): a GitHub Pages site built from `docs/visual/` (index page +
-  one page per item, linked to each other). Until Alexey gives the repo
-  name and says what is public, build the pages locally and show them in
-  the browser pane; don't create the repo or push.
+  one page per item, linked to each other). Public (Alexey, 27.09):
+  `https://alexeynovopashin-lab.github.io/cursed-sword/visual/`; entry page
+  `docs/visual/index.html`. Push to `main` after Alexey's word on a page;
+  check the live URL (ws rule 21).
 - Portrait links from Alexey go to `docs/visual/portraits.md` (hero → link).
 - Show a step, get Alexey's word, go on. One thread up to ~300k tokens; at the
   end — note in `SESSIONS_CHAT.md`, commit by file names.

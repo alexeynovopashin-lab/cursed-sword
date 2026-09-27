@@ -35,9 +35,11 @@ for the orchestrator.
 
 ## How
 
-- Each item is a claude.ai artifact (HTML page, private). Source lives in
-  `docs/visual/<name>.html` — artifacts are visible only in one account
-  (ws rule 24). Update the same artifact, don't make new links.
+- All items form one site — «доска сценариста» (Alexey: «как wiki, только
+  сложнее»): a GitHub Pages site built from `docs/visual/` (index page +
+  one page per item, linked to each other). Until Alexey gives the repo
+  name and says what is public, build the pages locally and show them in
+  the browser pane; don't create the repo or push.
 - Portrait links from Alexey go to `docs/visual/portraits.md` (hero → link).
 - Show a step, get Alexey's word, go on. One thread up to ~300k tokens; at the
   end — note in `SESSIONS_CHAT.md`, commit by file names.

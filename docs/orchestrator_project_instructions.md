@@ -2,10 +2,8 @@
 
 Source for the orchestrator's instructions, modelled on
 `light_plan:Light_Plan/docs/orchestrator_project_instructions.md` (27 September
-2026). Edit here, then paste where the orchestrator runs. **Pending Alexey:**
-where the orchestrator runs — a claude.ai Project (as Light Plan; needs a GitHub
-repo) or a chat on the Mac. «Where you run» below is written for the claude.ai
-Project and changes if he picks the Mac.
+2026). Alexey chose (27.09.2026): the orchestrator is a chat on the Mac,
+in the project folder; this file is its instructions.
 
 ---
 
@@ -29,22 +27,22 @@ code talk is opaque to him).
 6. `SESSIONS_CHAT.md` — hand-off channel between live chats; not in git;
    closed topics go to `SESSIONS_CHAT_archive/<date>.md`.
 
-## Where you run (claude.ai Project variant)
+## Where you run (chat on the Mac)
 
-You run in the cloud; iteration threads run on Alexey's Mac in
-`~/Documents/workspace/10_projects/cursed_sword` (Remote Control server,
-started by the command at the end). So:
-- read state from the GitHub repo; unpushed work does not exist for you — ask
-  the thread;
-- `SESSIONS_CHAT.md` is local (not in git): you can't read it; threads report
-  to you directly and write there only for each other;
-- iteration threads do NOT get Project Memory: anything a thread must know
-  goes into these instructions or repo files (NEXT_SESSION, DECISIONS,
-  ITERATIONS, CLAUDE.md).
+You are a Claude Code chat on Alexey's Mac in
+`~/Documents/workspace/10_projects/cursed_sword`. So:
+- read files and git directly; uncommitted work of other chats is normal —
+  name it, don't touch it;
+- read `SESSIONS_CHAT.md` (`grep -n` «оркестратор» / «всем», `tail -80`);
+  threads write their reports there and to Alexey;
+- you do not start threads yourself: give Alexey a ready starting prompt, he
+  opens a new chat in the project folder and pastes it;
+- threads read the same files, so everything they must know lives in repo
+  files (NEXT_SESSION, DECISIONS, ITERATIONS, CLAUDE.md), not in your chat.
 
 ## Per iteration report
 
-1. Git: commits exist (and are pushed, in the cloud variant); no foreign
+1. Git: commits exist; no foreign
    uncommitted work in the main folder (name it, don't touch it).
 2. `ITERATIONS.md` has the «Итог» of the step or iteration; `DECISIONS.md` has
    what Alexey decided in the thread, verbatim; `ROADMAP.md` status is current.
@@ -79,12 +77,3 @@ Starting prompt for an iteration thread:
 шаг K из M: <что входит>. Опора — docs/story/through_line.md и
 docs/story/bible.md. Шаг сделан или контекст у ~300 тыс. — итог в ITERATIONS.md,
 запись в SESSIONS_CHAT.md, коммит, отчёт мне, стоп. Отвечай по-русски.»
-
-## Remote Control server on the Mac (Alexey starts it)
-
-```
-cd ~/Documents/workspace/10_projects/cursed_sword && "$HOME/Library/Application Support/Claude/claude-code/2.1.281/claude.app/Contents/MacOS/claude" remote-control --name "CursedSword"
-```
-
-The version folder (`2.1.281`) changes when the app updates; check
-`ls "$HOME/Library/Application Support/Claude/claude-code/"`.

@@ -11,8 +11,191 @@
 <div class="wrap">
 <nav><a href="index.html">← Доска сценариста</a></nav>
 <h1>Схемы подземелий</h1>
-<p class="lead">Даркгрот по уровням.</p>
-<div class="empty"><b>Раздел в работе</b>Что здесь будет:<ul><li>Уровень 1: обучение мечника — слизь, гоблин</li><li>Уровень 2: следы отряда мечника</li><li>Уровень 3: комната пауков с водой, мимик, лабиринт</li><li>Дно: логово доппельгангера, темница герцога</li><li>Число уровней — пробел</li></ul></div>
+<p class="lead">Даркгрот — многоуровневый данж, этажи идут вниз (Алексей). Здесь погибли Бернар и отряд Габа, здесь заперт настоящий герцог; сюда «герцог» шлёт отряд за короной. Источники: <i>bible.md</i> §3.3, <i>through_line.md</i> §7, <i>season1.md</i> П4, идея Алексея о комнате пауков (<i>docs/ideas</i>, 26.09). Существа — в <a href="bestiary.html">бестиарии</a>. Тайна меча не раскрывается.</p>
+<div class="legend">
+  <span class="ok"><b>обычный текст</b> — решено Алексеем</span>
+  <span class="dr"><b>оранжевое</b> — черновик / предложение агента</span>
+  <span class="gp"><b>серое курсивом</b> — пробел, не решено</span>
+</div>
+
+<h2 class="sec">Даркгрот в разрезе</h2>
+<p class="sec-lead">Решено: первый уровень — место обучения мечника; на дне — настоящий герцог с короной. Раскладка уровней 2–3 — предложение «библии» §3.3, <span class="gp">число уровней — пробел</span>.</p>
+
+<section class="scheme" id="levels">
+  <h3>Уровни</h3>
+  <div class="scroll">
+  <svg class="sv" viewBox="0 0 1000 560" style="min-width:720px" role="img" aria-label="Разрез Даркгрота: вход, три уровня и дно">
+    <line x1="0" y1="64" x2="1000" y2="64" style="stroke:var(--muted);stroke-width:1.5"/>
+    <text class="s" x="986" y="84" text-anchor="end">поверхность · дорога от северных ворот Винтербурга</text>
+    <path d="M150,64 L150,40 Q175,14 200,40 L200,64" style="fill:#0a0806;stroke:var(--gold);stroke-width:2"/>
+    <text class="h" x="220" y="30">Вход</text>
+    <text class="s" x="220" y="48">нужна руна гильдии того же ранга; руну отряду даёт «герцог». Здесь Габ слышал крик Бернара — войти не смог</text>
+
+    <g style="--c:var(--sword)"><rect class="box" x="120" y="92" width="760" height="96" rx="10"/><rect class="acc" x="120" y="92" width="6" height="96"/>
+      <text class="k" x="146" y="118">УРОВЕНЬ 1</text><text class="h" x="146" y="142">Обучение мечника</text>
+      <text class="s" x="146" y="164">слизь, гоблин, привал у костра (П4). В акте III — те же комнаты: две хронологии</text>
+      <text class="s" x="146" y="180">«Откуда ты знаешь?» — «Бывал тут с моим наставником»</text></g>
+    <path class="ln" d="M840,190 L840,210" marker-end="url(#ah3)"/>
+
+    <g style="--c:var(--draft)"><rect class="box" x="140" y="214" width="720" height="84" rx="10"/><rect class="acc" x="140" y="214" width="6" height="84"/>
+      <text class="k" x="166" y="240">УРОВЕНЬ 2</text><text class="h dr" x="166" y="264">Следы отряда Габа</text>
+      <text class="s" x="166" y="286">спутники понимают, откуда прозвище; Габ об отряде умалчивал</text></g>
+    <path class="ln" d="M180,300 L180,320" marker-end="url(#ah3)"/>
+
+    <g style="--c:var(--draft)"><rect class="box" x="160" y="324" width="680" height="84" rx="10"/><rect class="acc" x="160" y="324" width="6" height="84"/>
+      <text class="k" x="186" y="350">УРОВЕНЬ 3</text><text class="h dr" x="186" y="374">Комната пауков · лабиринт</text>
+      <text class="s" x="186" y="396">идеи Алексея ложатся в Даркгрот (решено); на этот уровень — предложение</text></g>
+    <path class="ln" d="M800,410 L800,430" marker-end="url(#ah3)"/>
+
+    <g style="--c:var(--gold)"><rect class="box" x="180" y="434" width="640" height="100" rx="10"/><rect class="acc" x="180" y="434" width="6" height="100"/>
+      <text class="k" x="206" y="460">ДНО</text><text class="h" x="206" y="484">Темница настоящего герцога <tspan class="dr">· логово двойника</tspan></text>
+      <text class="s" x="206" y="506">на голове живого пленника — корона: «Я — герцог Винтербурга». Так раскрывается подмена</text>
+      <text class="s" x="206" y="524">в глубине отряд встречает «Бернара»: «Верни мне меч, пацан»; финал сезона</text></g>
+
+    <text class="s gp" x="892" y="372">мимик —</text><text class="s gp" x="892" y="388">уровень</text><text class="s gp" x="892" y="404">не решён</text>
+    <text class="s gp" x="14" y="258">где погибли</text><text class="s gp" x="14" y="274">Бернар и отряд —</text><text class="s gp" x="14" y="290">уровень не решён</text>
+    <defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+  </svg>
+  </div>
+</section>
+
+<div class="grid wide">
+<article class="card plain" style="--c:var(--gold)">
+  <div class="body">
+    <div class="role">Вход и руны</div>
+    <h2>Кто может войти</h2>
+    <dl>
+      <dt>Решено</dt><dd>У каждого данжа свой уровень, нужна руна гильдии авантюристов того же ранга. Руну в Даркгрот отряду даёт герцог. У Габа тогда была руна низкого ранга: он бежал под дождём к данжу с мечом, слышал крик старика, но войти не смог. Смерти Бернара не видел — только догадывается (Алексей, 27.09).</dd>
+      <dt>Пробел</dt><dd class="gp">Как Габ-ученик попал на первый уровень в П4 без своей руны — с руной Бернара? Не записано; передано оркестратору.</dd>
+    </dl>
+  </div>
+</article>
+<article class="card plain" style="--c:var(--gold)">
+  <div class="body">
+    <div class="role">Дно</div>
+    <h2>Корона и пленник</h2>
+    <dl>
+      <dt>Решено (27.09)</dt><dd>Это корона герцога Винтербурга. Когда двойник подменил герцога, настоящего уволокли в Даркгрот вместе с короной. На дне отряд находит её на голове живого пленника: «Я — герцог Винтербурга». Шутка эльфа: «От своей короны я сбежал, а теперь тащу чужую».</dd>
+      <dt>Предложение</dt><dd class="dr">Двойники держат жертв живыми, чтобы не терять облик (скелет §3). Дно — логово двойника; здесь же финал.</dd>
+    </dl>
+  </div>
+</article>
+</div>
+
+<h2 class="sec" id="level-1">Первый уровень — обучение и две хронологии</h2>
+<p class="sec-lead">Один и тот же уровень играется дважды: в П4 — с Бернаром, в акте III — с отрядом. В команде с игроком за Габа — гибрид (Алексей, 28.09): начало рассказа — в камере (серия 2), остальное — здесь, память вперемешку с настоящим, комната за комнатой.</p>
+
+<section class="scheme">
+  <h3>Комнаты уровня: память и сейчас</h3>
+  <p class="note">Решено: переход — капля воды и обращение: «пацан» в памяти, «Габ» сейчас (скелет §7). Порядок комнат — из П4; ход по стрелкам — <span class="dr">правила агента</span> (<i>docs/ideas/2026-09-28_act1_open_questions.md</i> §5).</p>
+  <div class="scroll">
+  <svg class="sv" viewBox="0 0 1000 338" style="min-width:760px" role="img" aria-label="Четыре комнаты первого уровня: память и настоящее по очереди">
+    <defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="arrowhead" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+    <text class="h" x="16" y="20">1 · Коридор</text><text class="h" x="261" y="20">2 · Слизь</text><text class="h" x="506" y="20">3 · Гоблин</text><text class="h" x="751" y="20">4 · Привал</text>
+    <g style="--c:var(--sword)">
+      <rect class="box" x="10" y="32" width="235" height="112" rx="10"/><rect class="box" x="255" y="32" width="235" height="112" rx="10"/><rect class="box" x="500" y="32" width="235" height="112" rx="10"/><rect class="box" x="745" y="32" width="235" height="112" rx="10"/>
+      <text class="k" x="24" y="54">ПАМЯТЬ · «ПАЦАН»</text><text class="k" x="269" y="54">ПАМЯТЬ · «ПАЦАН»</text><text class="k" x="514" y="54">ПАМЯТЬ · «ПАЦАН»</text><text class="k" x="759" y="54">ПАМЯТЬ · «ПАЦАН»</text>
+    </g>
+    <g class="dr-lines">
+      <text class="s dr" x="24" y="78">Капает вода. Бернар, хромая,</text><text class="s dr" x="24" y="96">пинает камень в темноту.</text><text class="s dr" x="24" y="114">«Держись рядом, пацан.</text><text class="s dr" x="24" y="132">Мне так спокойнее»</text>
+      <text class="s dr" x="269" y="78">«Слизь. Бей». Атака и щит.</text><text class="s dr" x="269" y="96">«Щит». «Ниже».</text><text class="s dr" x="269" y="114">«Живой? Ладно»</text>
+      <text class="s dr" x="514" y="78">Контратака. Гоблин кидается</text><text class="s dr" x="514" y="96">на Бернара — ученик</text><text class="s dr" x="514" y="114">закрывает его собой</text>
+      <text class="s dr" x="759" y="78">Ночь у костра: Бернар молчит,</text><text class="s dr" x="759" y="96">отпивает из фляги. Утром</text><text class="s dr" x="759" y="114">его нет, а меч лежит</text><text class="s dr" x="759" y="132">в костре, целый</text>
+    </g>
+    <g style="--c:var(--gold)">
+      <rect class="box" x="10" y="214" width="235" height="112" rx="10"/><rect class="box" x="255" y="214" width="235" height="112" rx="10"/><rect class="box" x="500" y="214" width="235" height="112" rx="10"/><rect class="box" x="745" y="214" width="235" height="112" rx="10"/>
+      <text class="k" x="24" y="236">СЕЙЧАС · «ГАБ»</text><text class="k" x="269" y="236">СЕЙЧАС · «ГАБ»</text><text class="k" x="514" y="236">СЕЙЧАС · «ГАБ»</text><text class="k" x="759" y="236">СЕЙЧАС · «ГАБ»</text>
+    </g>
+    <text class="s dr" x="24" y="260">Капля. «Он помнит</text><text class="s dr" x="24" y="278">этот коридор»</text>
+    <text class="s dr" x="269" y="260">«Та же слизь. Она выросла.</text><text class="s dr" x="269" y="278">Габ, как её?» — игрок</text><text class="s dr" x="269" y="296">повторяет тот же удар</text>
+    <text class="s gp" x="514" y="260">пишется на шаге 3 (акт III)</text>
+    <text class="s dr" x="759" y="260">Последняя капля —</text><text class="s dr" x="759" y="278">в глубине ждёт «Бернар»</text>
+    <path class="ln" d="M127,146 L127,210" marker-end="url(#ah4)"/><text class="s" x="135" y="182">капля</text>
+    <path class="ln" d="M160,212 C200,176 330,190 372,148" marker-end="url(#ah4)"/><text class="s" x="232" y="176">капля</text>
+    <path class="ln" d="M372,146 L372,210" marker-end="url(#ah4)"/>
+    <path class="ln" d="M405,212 C445,176 575,190 617,148" marker-end="url(#ah4)"/><text class="s" x="477" y="176">капля</text>
+    <path class="ln" d="M617,146 L617,210" marker-end="url(#ah4)"/>
+    <path class="ln" d="M650,212 C690,176 820,190 862,148" marker-end="url(#ah4)"/><text class="s" x="722" y="176">капля</text>
+    <path class="ln" d="M862,146 L862,210" marker-end="url(#ah4)"/>
+  </svg>
+  </div>
+  <ol class="steps">
+    <li><b>Команда с игроком за Габа.</b> В камере (серия 2) Габ уже рассказал начало — слизь и «Держись рядом» — и оборвал. Здесь память досказывает остальное: гоблин, закрыть собой, ночь, меч в костре.</li>
+    <li><span class="dr"><b>Правила переходов.</b> Переход — только между репликами Алисы, никогда внутри. Кусок памяти — не длиннее двух реплик. В памяти ходит только Габ; если заговорит другой — это вставка из настоящего: отряд трясёт застывшего Габа.</span></li>
+    <li><span class="dr"><b>Склейка по действию.</b> Прошлое кончается глаголом, настоящее начинается с него же: «Бей, пацан!» — капля — «Габ, как её?» Память работает как подсказка прямо в бою.</span></li>
+    <li><b>Один игрок за Габа</b> прошёл П4 целиком в начале — <span class="dr">здесь ему короткие эхо-реплики Бернара в тех же комнатах</span>. <b>Без игрока за Габа</b> Габ-спутник ведёт отряд: «Откуда ты знаешь?» — «Бывал тут с моим наставником».</li>
+  </ol>
+</section>
+
+<h2 class="sec" id="spiders">Комната пауков с водой</h2>
+<p class="sec-lead">Идея Алексея (26.09, пересказ близко к тексту — <i>docs/ideas/2026-09-26_voice_adventure_series.md</i>). Что она ляжет в Даркгрот — решено («библия» §3.3); уровень 3 — предложение. Клетки — только под капотом: игрок слышит «рой накрывает половину зала», а не координаты.</p>
+
+<section class="scheme">
+  <h3>План комнаты и ход ловушки</h3>
+  <p class="note">Предметы в комнате — Алексея; где что стоит — <span class="dr">расстановка агента</span>.</p>
+  <div class="split">
+  <div class="scroll">
+  <svg class="sv" viewBox="0 0 560 560" style="min-width:420px;max-width:560px" role="img" aria-label="План комнаты пауков 10 на 10 клеток">
+    <g id="cells">
+      <path class="cell" d="M96,50V510M142,50V510M188,50V510M234,50V510M280,50V510M326,50V510M372,50V510M418,50V510M464,50V510M50,96H510M50,142H510M50,188H510M50,234H510M50,280H510M50,326H510M50,372H510M50,418H510M50,464H510"/>
+    </g>
+    <path class="wall" d="M234,510 L50,510 L50,50 L510,50 L510,510 L326,510"/>
+    <text class="s" x="50" y="36">10 × 10 клеток (под капотом)</text>
+    <text class="s" x="280" y="536" text-anchor="middle">дверь — замуровывается</text>
+    <rect x="236" y="236" width="88" height="88" style="fill:none;stroke:var(--gold);stroke-width:2;stroke-dasharray:6 4"/>
+    <path d="M258,236V324M280,236V324M302,236V324M236,258H324M236,280H324M236,302H324" style="stroke:var(--gold);stroke-width:1;opacity:.6"/>
+    <text class="s" x="280" y="344" text-anchor="middle">окно в потолке,</text><text class="s" x="280" y="360" text-anchor="middle">решётка</text>
+    <rect class="obj" x="62" y="352" width="60" height="36" rx="4"/><text class="s" x="92" y="374" text-anchor="middle">сундук</text>
+    <rect class="obj" x="62" y="420" width="60" height="36" rx="4"/><text class="s" x="92" y="442" text-anchor="middle">сундук</text>
+    <circle cx="66" cy="130" r="8" style="fill:var(--draft);opacity:.9"/><text class="s" x="82" y="134">факел</text>
+    <rect class="obj" x="370" y="136" width="84" height="40" rx="6"/><text class="s" x="412" y="160" text-anchor="middle">скелет</text>
+    <text class="s" x="412" y="196" text-anchor="middle">по нему ползает паук</text>
+    <rect class="hid" x="160" y="52" width="40" height="12"/><text class="s dr" x="180" y="84" text-anchor="middle">рычаг 1</text>
+    <rect class="hid" x="496" y="382" width="12" height="40"/><text class="s dr" x="488" y="376" text-anchor="end">рычаг 2</text>
+    <g class="num"><circle cx="180" cy="104" r="11"/><text x="180" y="108">1</text></g>
+    <g class="num"><circle cx="190" cy="200" r="11"/><text x="190" y="204">2</text></g>
+    <g class="num"><circle cx="466" cy="402" r="11"/><text x="466" y="406">3</text></g>
+    <g class="num"><circle cx="336" cy="228" r="11"/><text x="336" y="232">4</text></g>
+    <g class="num"><circle cx="280" cy="480" r="11"/><text x="280" y="484">5</text></g>
+  </svg>
+  </div>
+  <ol class="steps">
+    <li>Отряд осматривается: два сундука, одна дверь, окно в потолке с решёткой, скелет, по которому ползает паук, факел на стене. Вор видит скрытые рычаги, нажимает один — с потолка сыплются пауки, сто штук. По одному слабые, вместе — колоссальный урон.</li>
+    <li>Все бьют по площади — остаётся 25. Рой — как один монстр: урон равен числу пауков, занимает большую площадь, по одному не перебить.</li>
+    <li>Пауки облепили героев. В свете стрел Вор замечает второй переключатель, нажимает — дверь замуровывается, комната заливается водой.</li>
+    <li>50 секунд на раздумье, вариантов спастись много, воды всё больше. Горящая стрела высветила решётку в потолке: Маг разбивает её с вероятностью; стрела Лучника не цепляется.</li>
+    <li>Все, кроме Мечника, всплывают. В тяжёлых доспехах он снимает их и всплывает — теряет щит и доспехи, больше не танк. Догадается попросить верёвку — нырнёт за доспехами.</li>
+  </ol>
+  </div>
+  <p class="note gp" style="margin-top:12px">Способности из этой идеи (стрела с верёвкой, залп, перчатки Рихтера у воина) придуманы до решения «у каждого героя два навыка» — как они ложатся на навыки героев, решит фаза 2 (механика).</p>
+</section>
+
+<h2 class="sec">Ещё не нарисовано</h2>
+<div class="grid wide">
+<article class="card plain" style="--c:var(--gap)">
+  <div class="body">
+    <div class="role">Уровень 3 — предложение</div>
+    <h2>Лабиринт</h2>
+    <dl>
+      <dt>Идея Алексея</dt><dd>Лабиринт, который игроки рисуют на бумаге.</dd>
+      <dt>Из разговора (не решено)</dt><dd class="dr">Карта на бумаге — механика; комнаты повторяются: «мы здесь уже были».</dd>
+      <dt>Пробел</dt><dd class="gp">Схема — когда будет сюжет акта III (шаг 3).</dd>
+    </dl>
+  </div>
+</article>
+<article class="card plain" style="--c:var(--gap)">
+  <div class="body">
+    <div class="role">Уровень не решён</div>
+    <h2>Сундук-мимик</h2>
+    <dl>
+      <dt>Идея Алексея</dt><dd>Сундуки и мимик; в «библии» — «Наконец-то».</dd>
+      <dt>Из разговора (не решено)</dt><dd class="dr">Первые два сундука настоящие, третий говорит: «Наконец-то».</dd>
+      <dt>Существо</dt><dd><a href="bestiary.html#mimic">Мимик в бестиарии →</a></dd>
+    </dl>
+  </div>
+</article>
+</div>
+
 </div>
 </body>
 </html>

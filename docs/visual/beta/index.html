@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Таверна — бета доски</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0c0a;--card:#1a1612;--card2:#221c16;--ink:#e9dfcc;--muted:#9a8b72;--line:#3a3026;--gold:#c9a45c;--draft:#e0a54a;
+  --sword:#d0604a;--bow:#6fbf80;--mage:#7f9cf0;--thief:#c095ee;--ok:#6fbf80;--bad:#d0604a;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);font:16px/1.55 "PT Sans",system-ui,sans-serif;background:radial-gradient(ellipse at 50% -10%,#2a1d12 0%,transparent 60%),var(--bg)}
+a{color:var(--gold)}
+.app{display:grid;grid-template-columns:minmax(0,1fr) auto;height:100vh}
+.game{display:flex;flex-direction:column;min-width:0;height:100vh}
+header.top{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+header.top h1{font:700 22px "Cormorant Garamond",serif;color:var(--gold);margin:0}
+header.top .tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--draft);border:1px solid var(--draft);border-radius:999px;padding:1px 8px}
+header.top .sp{flex:1}
+button{font:inherit;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:5px 12px;cursor:pointer}
+button:hover{border-color:var(--gold)}
+button.primary{background:#3a2a14;border-color:var(--gold);color:var(--gold);font-weight:700}
+button.small{font-size:12px;padding:2px 8px}
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:0;flex:1;min-height:0}
+.story{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+#log{flex:1;overflow:auto;padding:16px 20px;scroll-behavior:smooth}
+#log p{margin:0 0 10px;max-width:70ch}
+.pl{color:var(--gold);font-weight:700;border-left:3px solid var(--gold);padding-left:10px}
+.trace{display:none;font-size:12px;color:var(--muted);margin:-6px 0 10px 13px;font-family:ui-monospace,Menlo,monospace}
+body.dbg .trace{display:block}
+.sys{color:var(--muted);font-style:italic}
+.narr{white-space:pre-wrap}
+.intro{color:#cbbf9f}
+.end{margin:20px 0;padding:12px 16px;border:1px solid var(--gold);border-radius:10px;background:#1f1811}
+form.inp{display:flex;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:#120f0c}
+form.inp input{flex:1;font:inherit;color:var(--ink);background:#0b0908;border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+form.inp input:focus{outline:none;border-color:var(--gold)}
+.chips{padding:0 16px 8px;display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font-size:12px;padding:2px 9px;color:var(--muted)}
+.side{overflow:auto;padding:12px;min-height:0;display:flex;flex-direction:column;gap:12px}
+.box{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.box h3{margin:0 0 6px;font:700 11px "PT Sans";letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+#map{width:100%;height:auto;display:block}
+.room{fill:#15110d;stroke:var(--line)}
+.rname{fill:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.ritem{fill:#8f8168;font-size:9px}
+.fig .nm{font-size:8px;fill:var(--ink);text-anchor:middle}
+#dice{display:flex;align-items:center;gap:12px}
+.d20{width:64px;height:64px;position:relative;flex:none}
+.d20 svg{width:100%;height:100%}
+.d20 span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 22px "Cormorant Garamond",serif;color:var(--gold)}
+.dtxt{font-size:13px;color:var(--muted);line-height:1.3}
+.inv li{margin:0;padding:0;list-style:none;font-size:14px}
+.bar{height:6px;background:#0b0908;border-radius:3px;overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;background:var(--ok)}
+/* старт */
+#start{position:absolute;inset:0;background:var(--bg);overflow:auto;z-index:5;padding:28px 16px}
+#start .wrap{max-width:980px;margin:0 auto}
+#start h2{font:700 40px "Cormorant Garamond",serif;color:var(--gold);margin:0}
+.lead{color:var(--muted);max-width:70ch}
+.heroes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:20px 0}
+.hcard{border:1px solid var(--line);border-radius:12px;background:var(--card);overflow:hidden;cursor:pointer;position:relative;display:flex;flex-direction:column}
+.hcard.sel{border-color:var(--c);box-shadow:0 0 0 1px var(--c),0 0 26px color-mix(in srgb,var(--c) 30%,transparent)}
+.hcard::before{content:"";height:3px;background:var(--c)}
+.hcard img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;background:#120f0c}
+.hcard .b{padding:10px 12px}
+.hcard .r{color:var(--c);font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.hcard h4{font:700 22px "Cormorant Garamond",serif;margin:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:6px}
+.seg button{border:none;border-radius:0;background:transparent;padding:3px 12px;color:var(--muted)}
+.seg button.on{background:#3a2a14;color:var(--gold)}
+.row{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0}
+details.others{border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin:10px 0;background:var(--card)}
+details.others summary{cursor:pointer;color:var(--muted)}
+input.txt{font:inherit;color:var(--ink);background:#0b0908;border:1px solid var(--line);border-radius:6px;padding:4px 8px;width:150px}
+/* панель движка */
+#eng{width:460px;max-width:48vw;border-left:1px solid var(--line);background:#0c0a08;display:flex;flex-direction:column;height:100vh;min-width:0}
+body.noeng #eng{display:none}
+body.noeng .app{grid-template-columns:minmax(0,1fr)}
+#eng header{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line)}
+#eng header b{font:700 18px "Cormorant Garamond",serif;color:var(--gold)}
+#eng .body{overflow:auto;padding:10px 12px;flex:1;font-size:13px}
+#eng h3{margin:14px 0 6px;font:700 11px "PT Sans";letter-spacing:.14em;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:8px}
+#eng h3 span{color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.cl{border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:6px;background:#12100d}
+.cl .q{color:var(--muted)}
+.v{color:var(--gold);font-weight:700}
+.arg{display:inline-block;padding:0 6px;border-radius:999px;background:#2a221a;border:1px solid var(--line);margin:1px 2px;font-size:12px}
+.warn{color:var(--draft)}
+.good{color:var(--ok)}.bad{color:var(--bad)}
+table.rt{width:100%;border-collapse:collapse}
+table.rt td,table.rt th{padding:2px 4px;border-bottom:1px solid #241d16;text-align:left;font-size:12px}
+table.rt th{color:var(--muted);font-weight:400}
+.turn{display:flex;gap:6px;align-items:center;padding:4px 6px;border:1px solid transparent;border-radius:6px;cursor:pointer}
+.turn:hover{background:#17130f}
+.turn.cur{border-color:var(--gold);background:#1a1510}
+.turn .n{color:var(--muted);width:24px}
+.turn .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diff div{padding:1px 0}
+.diff .p{color:var(--muted)}
+.jsonbox{max-height:200px;overflow:auto;background:#0b0908;border:1px solid var(--line);padding:6px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
+@media (max-width:1000px){.stage{grid-template-columns:1fr}.side{display:none}#eng{max-width:100vw;width:100vw;position:fixed;inset:0;z-index:9}}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="game" style="position:relative">
+  <header class="top">
+    <h1>Таверна</h1><span class="tag">бета · черновик</span>
+    <span class="dtxt" id="heroLbl"></span>
+    <span class="sp"></span>
+    <button id="btnNew">Другой герой</button>
+    <button id="btnEng" class="primary">Панель движка</button>
+  </header>
+  <div class="stage">
+   <div class="story">
+    <div id="log"></div>
+    <div class="chips" id="chips"></div>
+    <form class="inp" id="form" autocomplete="off"><input id="inp" placeholder="Что ты делаешь? Например: толкаю дверь, беру сундук и подпираю" autofocus><button class="primary">Сказать</button></form>
+   </div>
+   <aside class="side">
+    <div class="box"><h3>Таверна</h3><svg id="map" viewBox="0 0 280 230"></svg></div>
+    <div class="box"><h3>Кубик</h3><div id="dice"></div></div>
+    <div class="box inv"><h3>Инвентарь и герой</h3><div id="inv"></div></div>
+    <div class="box"><h3>Отряд</h3><div id="party"></div></div>
+   </aside>
+  </div>
+  <div id="start"><div class="wrap">
+    <h2>Таверна</h2>
+    <p class="lead">Серия 1 «Таверна» из сезона 1 — пошаговая текстовая адвенчура. Пиши, что делаешь, своими словами: «толкаю дверь, беру сундук и подпираю». Игра разбирает фразу правилами, без языковой модели. Слова героев и рассказчика — <b style="color:var(--draft)">черновик</b> по <code>season1.md</code>; тайна меча здесь не раскрывается.</p>
+    <div class="heroes" id="heroes"></div>
+    <div class="row"><label>Имя (необязательно): <input class="txt" id="pcname"></label>
+      <label>Зерно кубика: <input class="txt" id="seed" placeholder="случайное" style="width:110px"></label></div>
+    <details class="others"><summary>Настроить остальных троих (пол влияет на реплики и на пару мечник–лучник)</summary><div id="others" class="row"></div></details>
+    <button class="primary" id="btnGo">Начать</button>
+  </div></div>
+ </div>
+ <aside id="eng">
+  <header><b>Панель движка</b><span class="dtxt">упрощённая D&amp;D · черновик</span><span style="flex:1"></span><button class="small" id="btnHide">Скрыть</button></header>
+  <div class="body" id="engBody"></div>
+ </aside>
+</div>
+<script src="lexicon.js"></script>
+<script src="parser.js"></script>
+<script src="game.js"></script>
+<script>
+(function(){
+'use strict';
+var H = CS.Game.HEROES, ORDER = CS.Game.ORDER, NAMES = CS.Game.NAMES;
+var PORT = { gab:'../img/gabriel.webp', elf:'../img/ellion.webp', mage:'../img/lucian.webp', nobby:'../img/nobby.webp' };
+var game = null, cfg = { pc:'gab', genders:{gab:'m',elf:'m',mage:'m',nobby:'m'} }, sel = 0;
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function ls(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){} }
+
+// ---- старт ----
+function segHTML(h,g){ return '<span class="seg" data-h="'+h+'"><button type="button" data-g="m" class="'+(g==='m'?'on':'')+'">м</button><button type="button" data-g="f" class="'+(g==='f'?'on':'')+'">ж</button></span>'; }
+function renderStart(){
+  $('heroes').innerHTML = ORDER.map(function(h){
+    return '<div class="hcard '+(cfg.pc===h?'sel':'')+'" data-h="'+h+'" style="--c:'+H[h].color+'"><img src="'+PORT[h]+'" alt=""><div class="b"><div class="r">'+H[h].role+'</div><h4>'+H[h].names[cfg.genders[h]]+'</h4>'+segHTML(h,cfg.genders[h])+'</div></div>';
+  }).join('');
+  $('others').innerHTML = ORDER.filter(function(h){return h!==cfg.pc;}).map(function(h){ return '<div>'+H[h].role+' · '+H[h].names[cfg.genders[h]]+' '+segHTML(h,cfg.genders[h])+'</div>'; }).join('');
+}
+document.addEventListener('click', function(e){
+  var sb = e.target.closest('.seg button');
+  if(sb){ e.stopPropagation(); var h = sb.parentNode.getAttribute('data-h'); cfg.genders[h] = sb.getAttribute('data-g'); renderStart(); return; }
+  var hc = e.target.closest('.hcard'); if(hc){ cfg.pc = hc.getAttribute('data-h'); renderStart(); }
+});
+$('btnGo').onclick = function(){
+  var c = { pc:cfg.pc, genders:JSON.parse(JSON.stringify(cfg.genders)), names:{} };
+  var nm = $('pcname').value.trim(); if(nm) c.names[cfg.pc] = nm;
+  var sd = $('seed').value.trim(); if(sd) c.seed = parseInt(sd,10) >>> 0;
+  game = new CS.Game(c); sel = 0; $('start').style.display='none'; render(true); $('inp').focus();
+};
+$('btnNew').onclick = function(){ $('start').style.display=''; renderStart(); };
+
+// ---- вывод ----
+function traceLine(rec){
+  if(rec.trace.meta) return 'команда: '+rec.trace.meta;
+  var parts = rec.trace.clauses.map(function(c){ return (c.verb||'?')+(c.args.length?'('+c.args.join(', ')+')':''); });
+  return parts.join(' → ') || 'не разобрано';
+}
+function renderLog(scroll){
+  var h = '<p class="narr intro">'+esc(game.intro)+'</p>';
+  game.turns.forEach(function(r){
+    h += '<p class="pl">› '+esc(r.input)+'</p><div class="trace">'+esc(traceLine(r))+'</div>';
+    r.text.forEach(function(t){ h += '<p class="narr">'+esc(t)+'</p>'; });
+  });
+  if(game.S.ended) h += '<div class="end"><b>Серия закончилась.</b> Можно откатиться на любой ход в панели движка, сыграть сцену заново или взять другого героя.</div>';
+  $('log').innerHTML = h;
+  if(scroll){ var l=$('log'); l.scrollTop = l.scrollHeight; }
+}
+function figSVG(f,x,y,pc){
+  var col = f.color;
+  return '<g class="fig" transform="translate('+x+','+y+')"><path d="M0,-14 a5,5 0 1,1 0.01,0 z M-7,4 L0,-8 L7,4 z" fill="'+col+'" stroke="'+(pc?'#fff':'#0008')+'" stroke-width="'+(pc?1.4:.6)+'"/><circle cx="0" cy="-16" r="5" fill="'+col+'" stroke="'+(pc?'#fff':'#0008')+'" stroke-width="'+(pc?1.4:.6)+'"/><text class="nm" y="12">'+esc(f.name.length>9?f.name.slice(0,8)+'…':f.name)+'</text></g>';
+}
+function renderMap(){
+  var v = game.viewState(), S = game.S, w = S.w;
+  var rooms = { bar:{x:6,y:6,w:130,h:96,n:'стойка'}, corner:{x:144,y:6,w:130,h:96,n:'угол'}, hall:{x:6,y:110,w:160,h:112,n:'зал'}, door:{x:174,y:110,w:100,h:112,n:'у двери'} };
+  var items = { bar:['миска молока: '+(w.milk==='gone'?'нет':'есть'),'кружек: '+w.mugs], corner:['большой стол'+(w.tableUp?' (поднят)':'')], hall:['табуретов: '+w.stools,'вилок: '+w.forks,'очаг, окно'], door:['дверь: '+(w.door.prop?'подпёрта':w.door.bolt?'на засове':w.door.open?'открыта':'закрыта'), 'сундук: '+(w.chest.at==='held'?'в руках':'у двери')] };
+  var s = '';
+  Object.keys(rooms).forEach(function(k){
+    var r = rooms[k]; s += '<rect class="room" x="'+r.x+'" y="'+r.y+'" width="'+r.w+'" height="'+r.h+'" rx="6"'+(v.at===k?' style="stroke:#c9a45c"':'')+'/><text class="rname" x="'+(r.x+6)+'" y="'+(r.y+12)+'">'+r.n+'</text>';
+    items[k].forEach(function(t,i){ s += '<text class="ritem" x="'+(r.x+6)+'" y="'+(r.y+r.h-6-(items[k].length-1-i)*10)+'">'+esc(t)+'</text>'; });
+    var here = v.figs.filter(function(f){return f.place===k;});
+    here.forEach(function(f,i){ s += figSVG(f, r.x+22+i*(r.w>110?32:28)%(r.w-24), r.y+44+Math.floor(i*30/(r.w-24))*26, f.pc); });
+  });
+  $('map').innerHTML = s;
+}
+function renderDice(){
+  var last = null;
+  for(var i=game.turns.length-1;i>=0 && !last;i--){ var rs=game.turns[i].rolls.filter(function(r){return r.dc!=null;}); if(rs.length) last = rs[rs.length-1]; }
+  if(!last){ $('dice').innerHTML='<div class="dtxt">Бросков пока не было. Кубик d20 включается, когда исход не очевиден.</div>'; return; }
+  $('dice').innerHTML = '<div class="d20"><svg viewBox="0 0 64 64"><polygon points="32,3 58,18 58,46 32,61 6,46 6,18" fill="#241d16" stroke="'+(last.ok?'#6fbf80':'#d0604a')+'" stroke-width="2"/></svg><span>'+last.die+'</span></div><div class="dtxt"><b>'+esc(last.label)+'</b><br>'+last.die+(last.mod>=0?' + ':' − ')+Math.abs(last.mod)+' = '+last.total+' против '+last.dc+'<br><b class="'+(last.ok?'good':'bad')+'">'+(last.crit?'критический успех':last.fumble?'критический промах':last.ok?'успех':'неудача')+'</b></div>';
+}
+function renderSide(){
+  var v = game.viewState(), S = game.S;
+  var inv = v.inv.map(function(i){ return NAMES[i]||i; });
+  var t = '<b style="color:'+H[S.pc].color+'">'+esc(game.gname(S.pc))+'</b> · '+H[S.pc].role;
+  t += '<div class="bar"><i style="width:'+Math.max(0,100*v.hp/v.hpMax)+'%"></i></div><div class="dtxt">здоровье '+v.hp+'/'+v.hpMax+(v.mana!=null?' · магия '+v.mana+'/3':'')+'</div>';
+  t += '<ul class="inv" style="padding:6px 0 0;margin:0">'+(inv.length?inv.map(function(i){return '<li>· '+esc(i)+'</li>';}).join(''):'<li class="dtxt">карманы пусты</li>')+(v.held?'<li>✋ в руках: '+esc(NAMES[v.held]||v.held)+'</li>':'')+(v.weaponIn?'<li class="dtxt">оружие — в сундуке у двери</li>':'')+'</ul>';
+  $('inv').innerHTML = t;
+  $('party').innerHTML = ORDER.map(function(h){ return '<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:'+H[h].color+'">'+esc(game.gname(h))+(h===S.pc?' (ты)':'')+'</span><span class="dtxt">'+H[h].role+'</span></div>'; }).join('');
+  $('heroLbl').textContent = game.gname(S.pc)+' · '+H[S.pc].role+' · фаза: '+({door:'у двери',evening:'вечер',brawl:'драка',arrest:'арест',end:'конец'})[S.phase];
+}
+function renderChips(){
+  var ex = { gab:['осмотреться','беру стол','закрываюсь столом','бью капитана табуреткой'], elf:['кладу лук в сундук','угощаю всех','бросаю вилку в капитана','что у меня'], mage:['кладу нож в сундук','подсаживаюсь к меченосцу','жгу усы капитану','лечу Габа'], nobby:['кладу нож в сундук','жду','срезаю кошелёк','швыряю миску молока в капитана'] }[game.S.pc];
+  $('chips').innerHTML = '<button type="button" data-t="подсказка">подсказка</button>'+ex.map(function(t){ return '<button type="button" data-t="'+esc(t)+'">'+esc(t)+'</button>'; }).join('');
+}
+$('chips').onclick = function(e){ var b=e.target.closest('button'); if(b){ $('inp').value=b.getAttribute('data-t'); $('inp').focus(); } };
+
+// ---- панель движка ----
+function fmtVal(v){ return v===undefined?'—':String(v); }
+function renderEng(){
+  var turns = game.turns, i = sel ? sel-1 : turns.length-1, r = turns[i];
+  var h = '';
+  h += '<h3>Сцена <span>зерно '+game.cfg.seed+' · ход '+game.turns.length+'</span></h3>';
+  h += '<div class="row" style="margin:4px 0"><button class="small" id="eRestart">Сцена заново (то же зерно)</button><button class="small" id="eSeed">Заново с новым зерном</button></div>';
+  if(!r){ h += '<p class="dtxt">Сделай первый ход — здесь появится разбор.</p>'; }
+  else {
+    h += '<h3>1. Как разобрана фраза <span>ход '+r.n+': «'+esc(r.input)+'»</span></h3>';
+    if(r.trace.meta) h += '<div class="cl">команда: <span class="v">'+esc(r.trace.meta)+'</span></div>';
+    r.trace.clauses.forEach(function(c){
+      h += '<div class="cl"><div class="q">«'+esc(c.text)+'»</div><div>действие: <span class="v">'+esc(c.verb||'не найдено')+'</span>'+(c.neg?' <span class="warn">(отрицание)</span>':'')+'</div><div>'+
+        (c.args.length?c.args.map(function(a){var p=a.split(':');return '<span class="arg">'+esc(p[0])+' → '+esc(NAMES[p[1]]||p[1])+'</span>';}).join(''):'<span class="dtxt">предметов и целей в фразе нет</span>')+'</div>'+
+        (c.resolved?'<div class="dtxt mono">итог: '+esc(['item','person','target','dst','with','src'].filter(function(k){return c.resolved[k];}).map(function(k){return k+'='+c.resolved[k];}).join(', ')||'без аргументов')+'</div>':'')+
+        (c.note?'<div class="warn">'+esc(c.note)+'</div>':'')+'</div>';
+    });
+    if(!r.trace.clauses.length && !r.trace.meta) h += '<div class="cl warn">действий не найдено</div>';
+    if(r.trace.corrections.length) h += '<div class="cl">самоисправления: '+r.trace.corrections.map(function(c){return '«'+esc(c.dropped)+'» отброшено'+(c.by?' → «'+esc(c.by)+'»':'');}).join('; ')+'</div>';
+    h += '<h3>2. Что не разобрано</h3>';
+    h += r.trace.unknown.length ? '<div class="cl warn">слова пропущены: '+r.trace.unknown.map(esc).join(', ')+'</div>' : '<div class="dtxt">пропущенных слов нет</div>';
+    h += '<h3>3. Броски</h3>';
+    if(r.rolls.length){
+      h += '<table class="rt"><tr><th>что</th><th>d20</th><th>мод</th><th>итог</th><th>порог</th><th></th></tr>'+r.rolls.map(function(x){
+        if(x.dmg) return '<tr><td>'+esc(x.label)+' (d'+x.sides+')</td><td>'+x.die+'</td><td>'+(x.mod>=0?'+':'')+x.mod+'</td><td>'+x.total+'</td><td>—</td><td>урон</td></tr>';
+        return '<tr><td>'+esc(x.label)+(x.bonusWhy?'<div class="dtxt">'+esc(x.bonusWhy)+'</div>':'')+(x.note?'<div class="dtxt">'+esc(x.note)+'</div>':'')+'</td><td>'+x.die+'</td><td>'+(x.mod>=0?'+':'')+x.mod+' <span class="dtxt">'+x.stat+'</span></td><td>'+x.total+'</td><td>'+x.dc+'</td><td class="'+(x.ok?'good':'bad')+'">'+(x.crit?'крит.':x.fumble?'провал':x.ok?'успех':'мимо')+'</td></tr>';
+      }).join('')+'</table>';
+    } else h += '<div class="dtxt">без бросков</div>';
+    h += '<h3>4. Что изменилось в мире</h3>';
+    h += r.diff.length ? '<div class="diff mono">'+r.diff.map(function(d){return '<div><span class="p">'+esc(d.path)+'</span>: '+esc(fmtVal(d.from))+' → <b>'+esc(fmtVal(d.to))+'</b></div>';}).join('')+'</div>' : '<div class="dtxt">состояние не менялось</div>';
+  }
+  h += '<h3>5. Журнал ходов <span>клик — смотреть; ↶ — вернуть состояние до хода</span></h3>';
+  h += turns.map(function(t,k){ return '<div class="turn'+(k===i?' cur':'')+'" data-i="'+(k+1)+'"><span class="n">'+t.n+'</span><span class="t">'+esc(t.input)+'</span><span class="dtxt">'+t.phaseFrom+(t.phaseTo!==t.phaseFrom?' → '+t.phaseTo:'')+'</span><button class="small" data-rb="'+t.n+'" title="Откатиться до этого хода">↶</button></div>'; }).join('') || '<div class="dtxt">пока пусто</div>';
+  h += '<h3>Числа под капотом <span>черновик правил</span></h3>';
+  h += '<table class="rt"><tr><th></th><th>сил</th><th>лов</th><th>инт</th><th>хар</th><th>здор.</th></tr>'+ORDER.map(function(k){var m=H[k].mods;return '<tr><td style="color:'+H[k].color+'">'+esc(game.gname(k))+'</td><td>'+m.str+'</td><td>'+m.dex+'</td><td>'+m.int+'</td><td>'+m.cha+'</td><td>'+game.S.hp[k]+'/'+H[k].hp+'</td></tr>';}).join('')+'</table>';
+  var S = game.S, b = S.b, w = S.w;
+  h += '<div class="dtxt mono" style="margin-top:6px">фаза: '+S.phase+' · событие: '+S.beat+' · такт вечера: '+S.t+'<br>драка: раунд '+b.round+', перевес '+b.ally+', стража на раунде '+b.guardsAt+'<br>капитан: здор. '+w.lizard.hp+', усы '+(w.lizard.moustache?'да':'нет')+', молоко '+(w.lizard.milk?'да':'нет')+', вилка '+(w.lizard.fork?'да':'нет')+', стол '+(w.lizard.table?'да':'нет')+'<br>эльфийка до меча: кубик атаки 18–20 (bible §4)</div>';
+  h += '<h3>Состояние (JSON)</h3><details><summary class="dtxt">показать</summary><div class="jsonbox mono">'+esc(JSON.stringify(game.S,null,1))+'</div></details>';
+  $('engBody').innerHTML = h;
+}
+$('engBody').onclick = function(e){
+  var rb = e.target.closest('[data-rb]');
+  if(rb){ e.stopPropagation(); var n=+rb.getAttribute('data-rb'); if(game.rollback(n)){ sel=0; render(true); $('inp').focus(); } return; }
+  var t = e.target.closest('.turn'); if(t){ sel = +t.getAttribute('data-i'); renderEng(); return; }
+  if(e.target.id==='eRestart'){ game.restart(false); sel=0; render(true); }
+  if(e.target.id==='eSeed'){ game.restart(true); sel=0; render(true); }
+};
+$('btnEng').onclick = function(){ document.body.classList.toggle('noeng'); document.body.classList.toggle('dbg', !document.body.classList.contains('noeng')); ls('eng', document.body.classList.contains('noeng')?'0':'1'); };
+$('btnHide').onclick = function(){ document.body.classList.add('noeng'); document.body.classList.remove('dbg'); ls('eng','0'); };
+
+function render(scroll){ renderLog(scroll); renderMap(); renderDice(); renderSide(); renderChips(); renderEng(); }
+
+$('form').onsubmit = function(e){
+  e.preventDefault(); if(!game) return;
+  var v = $('inp').value.trim(); if(!v) return; $('inp').value='';
+  game.input(v); sel = 0; render(true);
+};
+
+// старт: панель по умолчанию открыта (для анализа), можно скрыть
+if(ls('eng')==='0') document.body.classList.add('noeng'); else document.body.classList.add('dbg');
+renderStart();
+window.__game = function(){ return game; };
+})();
+</script>
+</body>
+</html>

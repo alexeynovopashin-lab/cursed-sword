@@ -9,23 +9,27 @@
 
 ## 1. Габриэль / Габриэла
 
+Правка 30.09 (Алексей): Габ — профи, не нищий неудачник: простая добротная
+броня, щит из зачарованного дуба. Лист, нарисованный 27.09 по прежнему
+промпту, показывает залатанный поддоспешник и простой деревянный щит.
+
 ```
 Character design reference sheet, one large page. STYLE: hand-painted watercolor and ink illustration, storybook fantasy, soft muted earthy palette (brown, slate blue, moss green, rust, cream), cream parchment paper background with light watercolor washes, hand-drawn thin ink frames with rounded corners, handwritten Russian captions in dark brown ink, small simple line icons, warm soft lighting, same style for every panel, not photorealistic, not 3D.
 
 LAYOUT: big title top-left, subtitle under it, a short quote near the figure; large full-body front view on the left with a vertical height ruler; top middle: 2x2 grid of face close-ups with captions; top right: "Детали" column of small close-ups with captions; far right: full-body back view and five color swatches; middle row: "Манера речи" panel with 4 hand-drawn speech bubbles, "Привычки" panel with 4 icons and short text, one small story panel; bottom left: height chart of four silhouettes; bottom row: 4 small scene vignettes with captions; bottom right: "Прошлое", "Формы по полу" (male and female face side by side), "Коротко" checklist.
 
-CHARACTER: young human swordsman around 18 who looks older, very tall (about 190 cm), broad shoulders, big rough hands, lean and heavy-boned, plain rugged honest face, heavy square jaw, nose slightly crooked from an old break, light stubble, tired deep-set eyes with dark circles, shaggy sandy-brown hair cut unevenly with a knife, experienced blade master, calm steady look. Oversized heavy brown travel cloak with bear-fur collar, too big even for him, hem dragging, sleeves rolled up; patched quilted gambeson; leather bracers; small belt pouch; round wooden shield; elegant classic longsword with simple cross guard and plain leather grip, blade straight and aligned with the hilt, dull and tarnished with rust spots, faint ancient inscriptions, no gems. Female version: same build and clothes, strong plain freckled face, hair cut short with a knife.
+CHARACTER: young human swordsman around 18 who looks older, very tall (about 190 cm), broad shoulders, big rough hands, powerful and heavy-boned, a mighty fighter, plain rugged honest face, heavy square jaw, nose slightly crooked from an old break, light stubble, tired deep-set eyes, short sandy-brown hair, experienced professional blade master, calm steady but aimless look, NOT a beggar, NOT ragged. Oversized heavy brown travel cloak with bear-fur collar, too big even for him, sleeves rolled up; simple but solid well-kept armor: good padded gambeson under a plain mail shirt, sturdy leather bracers and boots, nothing fancy but a professional's kit; small belt pouch; round shield of enchanted dark oak with a faint living wood grain and a sturdy iron rim; elegant classic longsword with simple cross guard and plain leather grip, blade straight and aligned with the hilt, dull and tarnished with rust spots, faint ancient inscriptions, no gems. Female version: same build and clothes, strong plain freckled face, hair cut short with a knife.
 
 CAPTIONS (exact Russian text):
 Title: «Габриэль / Габриэла». Subtitle: «мечник / танк». Quote: «Четверо. Все здесь.»
 Face grid: «Угу.» (deadpan) · «Со мной обычно умирают другие» (dry half-smile) · «Четверо. Все здесь.» (counting his people after a fight, tense relief) · «В ушах опять звенит» (pain, hand at temple).
-Детали: «Засечки на щите — с внутренней стороны» (close-up of carved notches) · «Плащ наставника — велик даже ему» · «Меч: тусклый, надписи на древнем языке» · «Большие руки бойца» · «Свистулька в кошельке».
+Детали: «Засечки на щите — с внутренней стороны» (close-up of carved notches) · «Плащ наставника — велик даже ему» · «Меч: тусклый, надписи на древнем языке» · «Щит из зачарованного дуба — выменян у гнома на голову огра» · «Свистулька в кошельке».
 Манера речи: «Слева двое. Нобби, низом. Я держу» (в бою) · «Тебя привела дорога. И пиво» (Луциану) · «Ты держишь меч, как ложку. Ешь им?» · «Не за что. Правда не за что».
 Привычки: «Спиной к стене, лицом к двери» · «Спит, обняв меч» · «Любит лошадей и бродячих собак» · «Ненавидит: благодарность, слово "проклятый", капающую воду».
 Story panel title «После битвы»: «Повеселел, полирует меч — и меч будто светлее».
 Прошлое: «Наставник Бернар ("Медведь"): "Держись рядом, пацан"» · «Бежал под дождём к данжу — руна гильдии была низкого ранга» · «Все говорят: меч — подарок».
 Формы по полу: «Габриэль» · «Габриэла» · «пацан / девчонка».
-Коротко: «человек» · «мастер клинка, опытен не по годам» · «танк: закрывает собой» · «обучен верховой езде, своей лошади нет» · «прозвище — Проклятый Меч».
+Коротко: «человек» · «профи, мастер клинка — но без цели в жизни» · «танк: закрывает собой» · «обучен верховой езде, своей лошади нет» · «прозвище — Проклятый Меч».
 Vignettes: «За кружкой, спиной к стене» · «С чужой лошадью ласковее, чем с людьми» · «Собака против Нобби» · «Засечки видит только он».
 
 HEIGHT CHART (strict): four silhouettes labeled «Габ» «Эльф» «Луциан» «Нобби». Gab tallest, about 190 cm, broad. Elf slender, about 180 cm, half a head shorter than Gab, taller than Lucian. Lucian average, about 170 cm, slightly chubby. Nobby shortest, about 150 cm, reaches Gab's chest, thin wiry HUMAN boy, not a dwarf, not stocky.

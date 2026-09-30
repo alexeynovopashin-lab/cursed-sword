@@ -10,7 +10,9 @@
 ## 1. Габриэль / Габриэла
 
 Правка 30.09 (Алексей): Габ — профи, не нищий неудачник: простая добротная
-броня, щит из зачарованного дуба. Лист, нарисованный 27.09 по прежнему
+броня, щит из зачарованного дуба. Образ — больше Лайос Тоден из «Подземелья
+вкусностей», чем Дунк: светловолосый, открытое простодушное лицо, загорается
+при виде чудовищ. Лист, нарисованный 27.09 по прежнему
 промпту, показывает залатанный поддоспешник и простой деревянный щит.
 
 ```
@@ -18,7 +20,7 @@ Character design reference sheet, one large page. STYLE: hand-painted watercolor
 
 LAYOUT: big title top-left, subtitle under it, a short quote near the figure; large full-body front view on the left with a vertical height ruler; top middle: 2x2 grid of face close-ups with captions; top right: "Детали" column of small close-ups with captions; far right: full-body back view and five color swatches; middle row: "Манера речи" panel with 4 hand-drawn speech bubbles, "Привычки" panel with 4 icons and short text, one small story panel; bottom left: height chart of four silhouettes; bottom row: 4 small scene vignettes with captions; bottom right: "Прошлое", "Формы по полу" (male and female face side by side), "Коротко" checklist.
 
-CHARACTER: young human swordsman around 18 who looks older, very tall (about 190 cm), broad shoulders, big rough hands, powerful and heavy-boned, a mighty fighter, plain rugged honest face, heavy square jaw, nose slightly crooked from an old break, light stubble, tired deep-set eyes, short sandy-brown hair, experienced professional blade master, calm steady but aimless look, NOT a beggar, NOT ragged. Oversized heavy brown travel cloak with bear-fur collar, too big even for him, sleeves rolled up; simple but solid well-kept armor: good padded gambeson under a plain mail shirt, sturdy leather bracers and boots, nothing fancy but a professional's kit; small belt pouch; round shield of enchanted dark oak with a faint living wood grain and a sturdy iron rim; elegant classic longsword with simple cross guard and plain leather grip, blade straight and aligned with the hilt, dull and tarnished with rust spots, faint ancient inscriptions, no gems. Female version: same build and clothes, strong plain freckled face, hair cut short with a knife.
+CHARACTER: young human swordsman around 18 who looks older, very tall (about 190 cm), broad shoulders, big rough hands, powerful and heavy-boned, a mighty fighter, open earnest simple-hearted face, square jaw, light stubble, short messy blond hair, curious eyes that light up at the sight of monsters, slightly awkward with people, experienced professional blade master, NOT a beggar, NOT ragged. Oversized heavy brown travel cloak with bear-fur collar, too big even for him, sleeves rolled up; simple but solid well-kept armor: good padded gambeson under a plain mail shirt, sturdy leather bracers and boots, nothing fancy but a professional's kit; small belt pouch; round shield of enchanted dark oak with a faint living wood grain and a sturdy iron rim; elegant classic longsword with simple cross guard and plain leather grip, blade straight and aligned with the hilt, dull and tarnished with rust spots, faint ancient inscriptions, no gems. Female version: same build and clothes, strong plain freckled face, hair cut short with a knife.
 
 CAPTIONS (exact Russian text):
 Title: «Габриэль / Габриэла». Subtitle: «мечник / танк». Quote: «Четверо. Все здесь.»

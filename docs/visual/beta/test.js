@@ -1,6 +1,6 @@
 /* Тесты беты «Таверна». Запуск: node docs/visual/beta/test.js */
 'use strict';
-require('./lexicon.js'); require('./parser.js'); require('./game.js');
+require('./lexicon.js'); require('./parser.js'); require('./refusals.js'); require('./game.js');
 var CS = globalThis.CS, fails = 0, total = 0;
 function ok(cond, name, extra) { total++; if (!cond) { fails++; console.log('FAIL: ' + name + (extra ? '\n      ' + extra : '')); } }
 function sig(text) {
@@ -377,7 +377,7 @@ ALL.forEach(function (pc) {
 (function () {
   ok(G.HEROES.elf.def === 'f', 'Эллион по умолчанию ж (решение Алексея 30.09)', G.HEROES.elf.def);
   var BAN = {
-    gab:   { f: [/[Мм]ечник(?![а-я])/, /[Зз]доровяк(?![а-я])/, /[Зз]доровяку/], m: [/[Мм]ечниц/, /здоровячк/] },
+    gab:   { f: [/[Мм]ечник(?![а-я])/, /[Зз]доровяк(?![а-я])/, /[Зз]доровяку/], m: [/[Мм]ечниц/, /здоровячк/, /валькири/, /амазонк/] },
     elf:   { f: [/ушаст(ый|ого)/, /должник/, /[Ээ]льф(а|у|е|ом|ы)?(?![а-яё])/], m: [/эльфийк/, /должниц/, /ушастой/] },
     mage:  { f: [/тебя видел(?![а-я])/], m: [/тебя видела/] },
     nobby: { f: [/вора(?![а-я])/, /Вора(?![а-я])/, /воришк[аи]? (?:он|его)/], m: [/воровк/, /Воровк/] }
@@ -471,8 +471,8 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
   var lk = says('gab', 5, ['иду к двери', 'закрываю дверь на засов']); ok(lk.S.w.door.bolt, 'на засов — дверь заперта', lastText(lk));
   var tw = says('gab', 5, ['подпираю дверь, чтобы не закрылась']); ok(!/Нет так нет/.test(lastText(tw)) && !/закрылась/.test(JSON.stringify(tw.S.queue)), 'хвост «чтобы не закрылась» не исполняется и не уходит в очередь', lastText(tw));
   var ag = says('gab', 5, ['не откажусь от пива']); ok(ag.S.held === 'mug' && !/Нет так нет/.test(lastText(ag)), '«не откажусь от пива» — согласие', lastText(ag));
-  ['беру бластер', 'стреляю из пистолета', 'беру плазмоган'].forEach(function (ph) { var x = says('gab', 5, [ph]); ok(/такого в этом мире нет/.test(lastText(x)) && !/Что взять/.test(lastText(x)), 'О6 «' + ph + '» — честный отказ со словом', lastText(x)); });
-  ['беру гитару', 'беру арбалет', 'беру жезл', 'беру зелье', 'беру волшебную палочку', 'беру кошачью мяту', 'беру крокодила'].forEach(function (ph) { var x = says('gab', 5, [ph]); ok(/здесь такого нет/.test(lastText(x)) && !/Что взять/.test(lastText(x)), 'О5 «' + ph + '» — «здесь такого нет», слово названо', lastText(x)); });
+  ['беру бластер', 'стреляю из пистолета', 'беру плазмоган'].forEach(function (ph) { var x = says('gab', 5, [ph]); ok(/В этом мире такого нет|такого слова не знаю/.test(lastText(x)) && /«[а-яё]+»/.test(lastText(x)) && !/Что взять/.test(lastText(x)), 'О6 «' + ph + '» — честный отказ со словом', lastText(x)); });
+  ['беру гитару', 'беру арбалет', 'беру жезл', 'беру зелье', 'беру волшебную палочку', 'беру кошачью мяту', 'беру крокодила'].forEach(function (ph) { var x = says('gab', 5, [ph]); ok(/Здесь такого нет|Нет такого|давно лежало/.test(lastText(x)) && /«[а-яё]+»/.test(lastText(x)) && !/Что взять/.test(lastText(x)), 'О5 «' + ph + '» — «здесь такого нет», слово названо', lastText(x)); });
   var kw = says('gab', 5, ['беру кружку']); ok(kw.S.held === 'mug', '«беру кружку» по-прежнему берёт кружку');
   var pend = says('mage', 3, ['кладу нож в сундук', 'кладу руки на Габа', 'пытаюсь заговорить капитана']); ok(!/Что положить/.test(lastText(pend)), 'находка 19: висящий вопрос не съедает фразу с неопознанным глаголом', lastText(pend));
 })();
@@ -566,5 +566,80 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
   var cnt = 0; ALL.forEach(function (pc) { var g = gameOf(pc, 9); OPEN[pc].forEach(function (l) { g.input(l); }); ['слушаю', 'слушаю', 'осматриваю слухи', 'осмотреться'].forEach(function (l) { g.input(l); }); for (var i = 0; i < 40 && !g.S.ended; i++) g.input('жду'); cnt += (g.intro + allText(g)).split('Проклятый Меч').length - 1; });
   ok(cnt === 1, 'слух «Проклятый Меч» звучит один раз на героя, во вступлении Мечника (не у сундука, не в «слушаю»)', 'всего ' + cnt + ' на 4 героя, ждали 1');
   ok(/{g:Наёмник\|Наёмница}/.test(require('fs').readFileSync(__dirname + '/game.js', 'utf8')) && /А ты сидишь в углу, спиной к стене/.test(gameOf('gab', 1).intro), 'вступление Мечника — по season1.md: «А ты сидишь в углу…», «Наёмник»'); })();
+
+// ======================================================================
+// Шаг 3.1: слова мечницы — «валькирия» у ведущего, «амазонка» у стражи; «силачка» и «здоровячка» не звучат (Алексей, 1.10)
+// ======================================================================
+(function () {
+  var bad = [];
+  ALL.forEach(function (pc) { for (var mask = 0; mask < 16; mask++) {
+    var gens = {}; ALL.forEach(function (h, i) { gens[h] = (mask >> i) & 1 ? 'f' : 'm'; });
+    var g = new G({ pc: pc, seed: 7, genders: gens });
+    OPEN[pc].concat(['осмотреться', 'осматриваю стол', 'подсаживаюсь к меченосцу']).forEach(function (l) { g.input(l); });
+    for (var i = 0; i < 40 && !g.S.ended; i++) g.input(i % 3 === 0 ? 'жду' : 'мяу');
+    var tx = g.intro + '\n' + allText(g);
+    var m = tx.match(/.{0,30}(силачк|здоровячк|великанш).{0,20}/); if (m) bad.push(pc + ' ' + mask + ': ' + m[0]);
+  } });
+  ok(!bad.length, '3.1: «силачка», «здоровячка», «великанша» не звучат ни у кого (4 героя × 16 сочетаний полов)', bad.slice(0, 3).join(' || '));
+  var seenV = false, seenA = false;
+  ALL.forEach(function (pc) {
+    var g = new G({ pc: pc, seed: 7, genders: { gab: 'f' } });
+    OPEN[pc].concat(['осмотреться', 'подсаживаюсь к меченосцу']).forEach(function (l) { g.input(l); });
+    if (pc !== 'gab' || true) { var t = g.intro + allText(g); if (pc !== 'gab' && /валькири/.test(t)) seenV = true; if (pc === 'gab' && /валькири/.test(t)) seenV = true; }
+  });
+  ok(seenV, '3.1: у ведущего мечница — «валькирия» (осмотр, «подсаживаюсь»)');
+  var a = toArrest('gab', 11); var ga = new G({ pc: 'gab', seed: 11, genders: { gab: 'f' } }); advance(ga, 'arrest'); ga.input('мяу');
+  ok(/амазонк/.test(lastText(ga)) && !/силачк|здоровяк/.test(lastText(ga)), '3.1: стражник зовёт мечницу «амазонкой»', lastText(ga));
+  var gm = gameOf('gab', 11, 'm'); advance(gm, 'arrest'); gm.input('мяу');
+  ok(/здоровяк/.test(lastText(gm)) && !/амазонк|валькири/.test(lastText(gm)), '3.1: мечника стражник зовёт «здоровяком»', lastText(gm));
+  var h = new G({ pc: 'mage', seed: 7, genders: { gab: 'f' } }); h.input('кладу нож в сундук'); var th = allText(h) + h.intro;
+  ok(/валькири/.test(th) && !/силачк/.test(th), '3.1: маг у сундука — «валькирия» (beatChestStage1/2)', th.slice(-300));
+})();
+
+// ======================================================================
+// Шаг 3.2: заглушки [ТЕКСТ] и подсказки в скобках заменены строками dialogue_s1_refusals.md (разделы 1–15); черновик помечается
+// ======================================================================
+(function () {
+  var PH = ['отказываюсь', 'не бью', 'сдаюсь', 'сдаюсь', 'сопротивляюсь', 'даю взятку хозяину', 'заказываю вино', 'отвлекаю хозяина', 'отвлекаю капитана', 'отвлекаю задиру', 'трогаю', 'трогаю хозяина', 'кладу руку на Габа',
+    'спасибо', 'целую', 'целую капитана', 'осматриваю слухи', 'беру бластер', 'беру гитару'];
+  var bad = [], draft = 0, n = 0;
+  ALL.forEach(function (pc) { [0, 1].forEach(function (late) { ['evening', 'brawl'].forEach(function (ph) {
+    PH.forEach(function (p) {
+      var g = gameOf(pc, 5); OPEN[pc].forEach(function (l) { g.input(l); }); advance(g, ph); if (g.S.phase !== ph) return;
+      g.input(p); var r = g.turns[g.turns.length - 1], t = r.text.join(' ');
+      n++; if (r.draft) draft++;
+      if (/\[ТЕКСТ\]|(^|\s)\(/.test(t)) bad.push(pc + '/' + ph + ' «' + p + '»: ' + t.slice(0, 80));
+    });
+  }); }); });
+  ok(!bad.length && n > 100, '3.2: ни одной заглушки [ТЕКСТ] и скобки-подсказки в ответах (' + n + ' фраз × 4 героя × вечер/драка)', bad.slice(0, 3).join(' || '));
+  ok(draft > 50, '3.2: ответы по строкам Диалогов помечены «черновик» в записи хода', draft + ' из ' + n);
+  var src = require('fs').readFileSync(__dirname + '/game.js', 'utf8');
+  ok(!/\[ТЕКСТ\]|STUB/.test(src), '3.2: в game.js нет заглушек [ТЕКСТ] и STUB');
+  ok(!/\(Три действия|\(Кошелёк/.test(src), '3.2: в game.js нет подсказок в скобках');
+  // пределы: полная ≤140, короткая ≤60 — для 16 сочетаний полов, 4 героев игрока, слова «X» в 20 знаков
+  var over = [], cnt = 0, REF = CS.REF;
+  ALL.forEach(function (pc) { for (var mask = 0; mask < 16; mask++) {
+    var gens = {}; ALL.forEach(function (h, i) { gens[h] = (mask >> i) & 1 ? 'f' : 'm'; });
+    var g = new G({ pc: pc, seed: 1, genders: gens });
+    Object.keys(REF).forEach(function (sec) { REF[sec].forEach(function (e) {
+      if (e.only && e.only !== pc || e.not === pc) return;
+      var t = g.T(e.t).split('«X»').join('«' + 'абвгдежзиклмнопрстуф'.slice(0, 20) + '»'); cnt++;
+      if (t.length > e.f) over.push(sec + ': ' + t.length + ' > ' + e.f + ' ' + t.slice(0, 50));
+      if (/\{[gelnp]:|%[a-z]+%|undefined/.test(t)) over.push(sec + ': мусор ' + t.slice(0, 50));
+    }); });
+  } });
+  ok(!over.length && cnt > 1000, '3.2: ' + cnt + ' строк (разделы 1–15 × герои × полы) — полная ≤140, короткая ≤60, без шаблонов', over.slice(0, 3).join(' || '));
+  // повтор подряд — короткая форма
+  var r = gameOf('gab', 5); r.input('осматриваю слухи'); var first = lastText(r); r.input('осматриваю слухи'); var second = lastText(r);
+  ok(second !== first && second.length <= 60 && r.S.f.lk === 14, '3.2: повтор подряд — короткая форма (≤60)', first.length + ' → ' + second.length + ': ' + second);
+  // «помощь» и подсказки героя Эллион и Нобби — без скобок и с их именем
+  var e = gameOf('elf', 5); OPEN.elf.forEach(function (l) { e.input(l); }); for (var i = 0; i < 6; i++) e.input('жду');
+  ok(/Эллион, кошелёк у тебя полный|Кошелёк полный, зал жаждет/.test(allText(e)), '3.2: подсказка Эллион про кошелёк — словами ведущего', allText(e).slice(0, 200));
+  var nb = gameOf('nobby', 5); OPEN.nobby.forEach(function (l) { nb.input(l); }); for (i = 0; i < 8; i++) nb.input('жду');
+  ok(/[Кк]ошелёк Габа звякает слева/.test(allText(nb)), '3.2: подсказка Нобби про кошелёк Габа — словами ведущего', '');
+  var q = gameOf('gab', 5); q.input('осматриваюсь, слушаю, жду, иду к стойке, беру кружку');
+  ok(/За ход успеваешь три дела|Три дела за ход/.test(lastText(q)) && q.turns[0].notes.join(' ').indexOf('очередь') >= 0 && q.S.queue.length >= 1, '3.2: больше трёх действий — строка ведущего без скобок, очередь видна в панели', lastText(q));
+})();
+
 console.log('\nПроверок: ' + total + ', упало: ' + fails);
 process.exit(fails ? 1 : 0);

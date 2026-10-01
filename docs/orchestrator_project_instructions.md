@@ -36,7 +36,7 @@ documents, and answer Alexey. Reply to Alexey in Russian, plain product words
 
 ## Team (details in `docs/team/README.md`)
 
-Orchestrator · Сценарий · Диалоги · Механики · Геймплей · Локации и звук ·
+Orchestrator · Сценарий · Диалоги · Литератор · Механики · Геймплей · Локации и звук ·
 Бета игры · Тест игры; reserve: Техника (phase 3, on Alexey's word), Озвучка.
 One file — one owner; a thread never edits another role's files, it leaves a
 note in `SESSIONS_CHAT.md`. Only you push, only on Alexey's word, never force.

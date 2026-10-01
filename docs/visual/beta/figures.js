@@ -146,7 +146,7 @@
       s.push(torso(f, p, c)); s.push(R(-p.wa, f.hip - 5, 2 * p.wa, 4, 1, '#2a2018'));
       s = s.concat(arms(f, p, mix(c, '#000000', 0.2), '#d9a77f', 0.34));
       s = s.concat(head(f, '#d9a77f'));
-      s.push(hairCap(f, '#2a2218', { w: 1.08 })); s.push(P([[-f.rx * 0.9, f.hy + 2], [f.rx * 0.9, f.hy + 2], [f.rx * 0.6, f.hy + f.ry * 0.95], [-f.rx * 0.6, f.hy + f.ry * 0.95]], '#4a3a2c')); // щетина
+      s.push(hairCap(f, '#2a2218', { w: 1.08 })); s.push(P([[-f.rx * 0.9, f.hy + f.ry * 0.35], [f.rx * 0.9, f.hy + f.ry * 0.35], [f.rx * 0.6, f.hy + f.ry * 0.95], [-f.rx * 0.6, f.hy + f.ry * 0.95]], '#7a6450')); // щетина только на подбородке
       s.push(L(-f.rx * 0.6, f.hy - f.ry * 0.12, -f.rx * 0.15, f.hy - f.ry * 0.02, INK, 1.4)); s.push(L(f.rx * 0.15, f.hy - f.ry * 0.02, f.rx * 0.6, f.hy - f.ry * 0.12, INK, 1.4)); // хмурые брови
       s = s.concat(eyes(f));
       return s;

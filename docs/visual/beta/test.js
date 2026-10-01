@@ -75,6 +75,7 @@ ok(CS.parse('дрючу фуфлыжник табуретом').unknown.indexOf(
 
 // ---- игра ----
 var G = CS.Game;
+function dk(g) { return g.S.f.team ? g.S.f.team.dec[g.S.f.team.order[0]].kind : undefined; } // решение первого игрока в аресте (раньше хранилось в S.f.arrest)
 function play(pc, gender, lines, seed) {
   var g = new G({ pc: pc, seed: seed || 11, genders: (function () { var o = {}; o[pc] = gender; return o; })() });
   lines.forEach(function (l) { g.input(l); });
@@ -343,7 +344,7 @@ ALL.forEach(function (pc) {
     ok(g.S.phase === 'arrest' && !g.S.ended, 'арест начался, серия ещё идёт (' + p[0] + ')', g.S.phase);
     g.input(p[1]);
     var tx = g.turns[g.turns.length - 1].text.join(' ');
-    ok(g.S.ended && g.S.f.arrest === p[0], 'выбор «' + p[0] + '» записан в мир и закрывает серию', JSON.stringify(g.S.f.arrest) + ' ended=' + g.S.ended);
+    ok(g.S.ended && dk(g) === p[0], 'выбор «' + p[0] + '» записан в мир и закрывает серию', JSON.stringify(dk(g)) + ' ended=' + g.S.ended);
     ok(/Герцог хочет их видеть/.test(tx), 'крючок серии на месте при выборе «' + p[0] + '»');
     ENDS[p[0]] = tx;
     if (p[0] === 'resist') ok(g.S.hp.gab < hp0, 'сопротивление стоит здоровья', hp0 + ' → ' + g.S.hp.gab);
@@ -354,10 +355,10 @@ ALL.forEach(function (pc) {
   var g = toArrest('gab', 11); g.input('ем вилку');
   ok(!g.S.ended && g.S.phase === 'arrest', 'арест: «ем вилку» не закрывает серию', 'ended=' + g.S.ended);
   g.input('пью пиво'); g.input('читаю меню');
-  ok(g.S.ended && g.S.f.arrest === 'calm', 'арест: без решения стража теряет терпение за три отвлечения', JSON.stringify(g.S.f.arrest));
+  ok(g.S.ended && dk(g) === 'calm', 'арест: без решения стража теряет терпение за три отвлечения', JSON.stringify(dk(g)));
   ALL.forEach(function (pc) {
     var h = toArrest(pc, 5); h.input('бью капитана');
-    ok(h.S.ended && h.S.f.arrest === 'resist', 'арест, сопротивление, герой ' + pc, JSON.stringify(h.S.f.arrest));
+    ok(h.S.ended && dk(h) === 'resist', 'арест, сопротивление, герой ' + pc, JSON.stringify(dk(h)));
   });
 })();
 
@@ -365,10 +366,10 @@ ALL.forEach(function (pc) {
 (function () {
   ['сдаюсь', 'поднимаю руки', 'падаю на колени', 'не сопротивляюсь', 'иду с ними', 'сдаю оружие'].forEach(function (ph) {
     var g = toArrest('gab', 11); g.input(ph);
-    ok(g.S.ended && g.S.f.arrest === 'calm', 'арест: «' + ph + '» — покорность', JSON.stringify(g.S.f.arrest) + ' ended=' + g.S.ended);
+    ok(g.S.ended && dk(g) === 'calm', 'арест: «' + ph + '» — покорность', JSON.stringify(dk(g)) + ' ended=' + g.S.ended);
   });
   var g = toArrest('gab', 11); g.input('бью капитана, потом сдаюсь');
-  ok(g.S.f.arrest === 'resist', 'арест: в цепочке решает первое действие', JSON.stringify(g.S.f.arrest));
+  ok(dk(g) === 'resist', 'арест: в цепочке решает первое действие', JSON.stringify(dk(g)));
   var h = toArrest('gab', 11); var hp = h.S.hp.gab; h.input('бью капитана и бью капитана'); ok(h.S.hp.gab === hp - 5, 'арест: здоровье списано один раз за ход (контакт: Габ −5, «ранен»)', hp + ' → ' + h.S.hp.gab);
 })();
 
@@ -499,17 +500,17 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
 // 2.2 арест: терпение, четыре исхода, списки фраз (arrest_s1.md)
 (function () {
   var g = toArrest('gab', 11);
-  ['сопротивляюсь', 'упираюсь', 'отбиваюсь', 'пинаю стражника', 'вырываюсь', 'не дамся', 'плюю в капитана'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'resist', 'арест: «' + ph + '» — сопротивление', x.S.f.arrest + ' ended=' + x.S.ended); });
-  ['сдаёмся', 'веди', 'подчиняюсь', 'не буду сопротивляться', 'подставляю руки', 'иду за стражей', 'киваю', 'отказываюсь драться', 'не буду драться', 'не дерусь', 'драться не буду', 'бросаю оружие'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'calm', 'арест: «' + ph + '» — покорность', x.S.f.arrest + ' ended=' + x.S.ended); });
-  ['рвусь к выходу', 'исчезаю', 'растворяюсь в толпе', 'шмыгаю к двери'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'run', 'арест: «' + ph + '» — бег', x.S.f.arrest + ' ended=' + x.S.ended); });
-  ['умоляю', 'герцог', 'хочу к герцогу', 'подкупаю стражника', 'шепчу капитану: вы не правы', 'это недоразумение'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'plead', 'арест: «' + ph + '» — уговоры', x.S.f.arrest + ' ended=' + x.S.ended); });
-  ['отказываюсь идти', 'не пойду'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'resist', 'арест: «' + ph + '» — сопротивление без удара', x.S.f.arrest + ' ended=' + x.S.ended); });
+  ['сопротивляюсь', 'упираюсь', 'отбиваюсь', 'пинаю стражника', 'вырываюсь', 'не дамся', 'плюю в капитана'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && dk(x) === 'resist', 'арест: «' + ph + '» — сопротивление', dk(x) + ' ended=' + x.S.ended); });
+  ['сдаёмся', 'веди', 'подчиняюсь', 'не буду сопротивляться', 'подставляю руки', 'иду за стражей', 'киваю', 'отказываюсь драться', 'не буду драться', 'не дерусь', 'драться не буду', 'бросаю оружие'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && dk(x) === 'calm', 'арест: «' + ph + '» — покорность', dk(x) + ' ended=' + x.S.ended); });
+  ['рвусь к выходу', 'исчезаю', 'растворяюсь в толпе', 'шмыгаю к двери'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && dk(x) === 'run', 'арест: «' + ph + '» — бег', dk(x) + ' ended=' + x.S.ended); });
+  ['умоляю', 'герцог', 'хочу к герцогу', 'подкупаю стражника', 'шепчу капитану: вы не правы', 'это недоразумение'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && dk(x) === 'plead', 'арест: «' + ph + '» — уговоры', dk(x) + ' ended=' + x.S.ended); });
+  ['отказываюсь идти', 'не пойду'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && dk(x) === 'resist', 'арест: «' + ph + '» — сопротивление без удара', dk(x) + ' ended=' + x.S.ended); });
   var y = toArrest('gab', 11); y.input('подхожу к магу'); ok(!y.S.ended && /Куда/.test(lastText(y)), 'арест: «подхожу к магу» — не бег, стражник не пускает', lastText(y));
   // терпение: три хода, три ступени вместо «Не понял тебя»
   var p = toArrest('gab', 11);
   p.input('мяу'); ok(!p.S.ended && /^Стражник: —/.test(lastText(p)) && /Сдаёшься, болтаешь, дерёшься или бежишь/.test(lastText(p)), 'терпение 1: стражник', lastText(p));
   p.input('мяу'); ok(!p.S.ended && /^Лизард: —/.test(lastText(p)), 'терпение 2: Лизард', lastText(p));
-  p.input('мяу'); ok(p.S.ended && p.S.f.arrest === 'calm' && p.S.f.arrestBy === 'idle' && /молчание — знак согласия|решает сама/.test(p.turns[p.turns.length - 1].text.join(' ')), 'терпение 3: ведущий, покорность молчанием, флаг idle', JSON.stringify(p.S.f));
+  p.input('мяу'); ok(p.S.ended && dk(p) === 'calm' && p.S.f.team.dec.gab.by === 'idle' && /молчание — знак согласия|решает сама/.test(p.turns[p.turns.length - 1].text.join(' ')), 'терпение 3: ведущий, покорность молчанием, флаг idle', JSON.stringify(p.S.f));
   var l = toArrest('gab', 11), n = 0; for (var i = 0; i < 40 && !l.S.ended; i++) { l.input('ыыы фыр'); n++; }
   ok(n === 3 && l.S.ended, 'любая бессмыслица подряд — серия кончается на третьем ходу (не 40-м)', 'ходов ' + n);
   var s = toArrest('gab', 11), cnt = 0; for (i = 0; i < 40 && !s.S.ended; i++) { s.input('сопротивляюсь'); cnt++; } ok(cnt === 1, '«сопротивляюсь» — решение с первого хода, не 35 раз подряд', 'ходов ' + cnt);
@@ -540,7 +541,7 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
   g.input('сдаюсь'); var tx = lastText(g);
   ok(g.S.ended && g.S.f.team.dec.mage.kind === 'calm', 'команда: решил последний — развязка', tx);
   ok(/Эллион могла бы назвать себя/.test(tx) && /Нобби идёт тихо/.test(tx) && !/Габ молча/.test(tx), 'команда: пустые места сдаются, решившие — нет', tx);
-  ok(g.S.f.s2.gab === 'resist' && g.S.f.s2.mage === 'calm' && g.turns[g.turns.length - 1].notes.join(' ').indexOf('серия 2 — позже') >= 0, 'серия 2: выбор запомнен, реплика — заглушка «серия 2 — позже»', JSON.stringify(g.S.f.s2));
+  ok(g.S.f.team.dec.gab.kind === 'resist' && g.S.f.team.dec.mage.kind === 'calm' && g.turns[g.turns.length - 1].notes.join(' ').indexOf('серия 2 — позже') >= 0, 'серия 2: выбор запомнен, реплика — заглушка «серия 2 — позже»', JSON.stringify(g.S.f.team.dec));
   var h = team(['gab', 'mage']); h.input('ыыы'); h.input('ыыы'); h.input('ыыы'); ok(h.S.f.team.dec.gab && h.S.f.team.dec.gab.by === 'idle' && !h.S.ended, 'команда: Габ молчит три круга — сдаётся, ход мага', JSON.stringify(h.S.f.team.dec));
 })();
 // 2.4 находки теста 2
@@ -750,6 +751,31 @@ function notesOf(g) { return g.turns[g.turns.length - 1].notes.join(' | '); }
     e.input('беру вилку'); e.input('бросаю вилку в капитана'); var er = lastRolls(e).filter(function (r) { return !r.dmg && /бросок/.test(r.label); })[0]; if (er && er.die < 11) { sh++; if (e.S.f.shock !== 1) shBad.push('нет флага шока'); if (er.mod !== 4) shBad.push('штраф за шок: mod ' + er.mod); } }
   ok(sh >= 2 && !shBad.length, '3.3: шок Эллион — флаг без штрафа (' + sh + ' случаев)', shBad.join('; '));
   var ea = gameOf('elf', 3); OPEN.elf.forEach(function (l) { ea.input(l); }); advance(ea, 'brawl'); ea.input('беру вилку'); ea.input('бросаю вилку в капитана'); ok(!ea.S.f.shock, '3.3: в фазе А (18–20) шока нет');
+})();
+
+// ======================================================================
+// Шаг 3.4: репутация у стражи — ярлык и число в блоке «сезон», не в сцене (flags.md, вариант В; Алексей 1.10)
+// ======================================================================
+(function () {
+  var CASE = [['сдаюсь', 't0'], ['умоляю', 'p1'], ['рвусь к выходу', 'g2'], ['упираюсь', 'b2'], ['бью стражника', 'b3']], bad = [];
+  CASE.forEach(function (c) { ALL.forEach(function (pc) { var x = toArrest(pc, 11); x.input(c[0]); if (!x.S.ended || x.S.season.rp !== c[1]) bad.push(pc + ' «' + c[0] + '»: ' + x.S.season.rp + ', ждали ' + c[1]); }); });
+  ok(!bad.length, '3.4: репутация = ярлык + строгость: покорность t0, уговоры p1, бег g2, упор b2, контакт b3 (4 героя)', bad.slice(0, 3).join('; '));
+  var g = toArrest('gab', 11); g.input('бью стражника');
+  ok(g.S.f.arrest === undefined && g.S.f.arrestBy === undefined && g.S.season.rp === 'b3' && g.S.season.s === 1, '3.4: выбор не лежит в сцене (S.f.arrest, arrestBy нет), лежит в S.season.rp', JSON.stringify(g.S.season) + ' ' + Object.keys(g.S.f));
+  ok(JSON.stringify({ rp: g.S.season.rp }).length === 11, '3.4: ярлык и число — 11 байт, как в flags.md', JSON.stringify({ rp: g.S.season.rp }));
+  ok(g.stateBytes().season <= 200, '3.4: блок «сезон» ≤ 200 байт', JSON.stringify(g.S.season).length + ' Б');
+  var t = new G({ pc: 'gab', seed: 11, players: ['gab', 'mage'], genders: {} }); advance(t, 'arrest'); t.input('Габ бьёт стражника'); t.input('сдаюсь');
+  ok(t.S.season.rp === 'x3', '3.4: отряд 2: брыкун и тихоня поровну — «по-разному», строгость максимум (x3)', t.S.season.rp);
+  var u = new G({ pc: 'gab', seed: 11, players: ['gab', 'elf', 'mage'], genders: {} }); advance(u, 'arrest'); u.input('сдаюсь'); u.input('сдаюсь'); u.input('бью стражника');
+  ok(u.S.season.rp === 't3', '3.4: отряд 3: двое тихих и один брыкун — «тихоня», строгость 3 (максимум)', u.S.season.rp);
+  var before = JSON.stringify(g.S.season); g.restart(false); ok(JSON.stringify(g.S.season) === '{"s":1}' && before !== JSON.stringify(g.S.season), '3.4: перезапуск сцены начинает серию с чистым сезоном');
+  var rb = toArrest('gab', 11), n = rb.turns.length; rb.input('бью стражника'); rb.rollback(n + 1); ok(rb.S.season.rp === undefined, '3.4: откат хода возвращает и репутацию');
+  // бюджет состояния: сцена не растёт (было 935 Б на старте и 1386 Б максимум по flags.md/отчёту теста 2)
+  var start = {}, mx = 0, mxs = 0;
+  ALL.forEach(function (pc) { start[pc] = gameOf(pc, 1).stateBytes().scene; });
+  fuzz(ALL, 60, function (g2) { var b = g2.stateBytes(); mx = Math.max(mx, b.scene); mxs = Math.max(mxs, b.season); });
+  var BASE = { gab: 935, elf: 936, mage: 939, nobby: 942 }; // старт на 05791fc, замер сцены без сезона
+  ok(ALL.every(function (k) { return start[k] <= BASE[k]; }) && mx <= 1386 && mxs <= 200, '3.4: состояние не растёт: сцена на старте не больше, чем на 05791fc (935–942 Б), максимум ≤ 1386 Б; сезон ≤ 200 Б', JSON.stringify(start) + ' макс ' + mx + ' сезон ' + mxs);
 })();
 
 console.log('\nПроверок: ' + total + ', упало: ' + fails);

@@ -82,7 +82,7 @@
         guards: false
       },
       b: { round: 0, ally: 0, guardsAt: 5, done: {}, held: null, sigQueue: [] },
-      f: {}, players: (c.players && c.players.length ? c.players.slice() : [pc])
+      season: { s: 1 }, f: {}, players: (c.players && c.players.length ? c.players.slice() : [pc])
     };
     if (pc === 'gab') { S.inv = []; S.armed = false; S.weaponIn = true; S.at = 'corner'; S.phase = 'evening'; S.w.chest.has = ['sword']; S.w.purse = 'gab'; }
     else {
@@ -175,6 +175,7 @@
     if (!c.length) c = pool.filter(function (e) { return e.f === 60 && !e.sp; });
     if (!c.length) c = pool.filter(function (e) { return e.f === want; });
     if (!c.length) c = pool;
+    if (!c.length) return null; // таблица строк не подключена
     var e = c[(S.turn * 5 + sec) % c.length];
     S.f.lk = sec; this.draft = true;
     var t = e.t; if (word) t = t.split('«X»').join('«' + word + '»');
@@ -214,7 +215,7 @@
   // ---- ход ---------------------------------------------------------------
   Game.prototype.input = function (text) {
     var before = clone(this.S), rec = { n: this.turns.length + 1, input: text, text: [], rolls: [], trace: null, diff: [], phaseFrom: this.S.phase };
-    this.rolls = rec.rolls; this.out = rec.text; this.cost = 0; this.mark = null; this.acted = 0; this.refused = false; this.draft = false; this.notes = []; this.idleTurn = false; this.S.f.arrestDone = false;
+    this.rolls = rec.rolls; this.out = rec.text; this.cost = 0; this.mark = null; this.acted = 0; this.refused = false; this.draft = false; this.notes = []; this.idleTurn = false; delete this.S.f.arrestDone;
     var S = this.S, tooLong = false;
     if (text.length > MAX_INPUT) { text = text.slice(0, MAX_INPUT); rec.input = text; tooLong = true; }
     var p = CS.parse(text);
@@ -1469,7 +1470,6 @@
     tr.resolved = { verb: verb, arrest: kind, how: how };
     S.f.arrestDone = true;
     team.dec[hero] = { kind: kind, how: how, by: how === 'idle' ? 'idle' : 'word' };
-    if (!S.f.arrest) { S.f.arrest = kind; S.f.arrestBy = how === 'idle' ? 'idle' : 'word'; }
     this.arrestLine(hero, kind, how, A, c);
     if (kind === 'resist') { // rolls.md §5, вопрос 3А (рабочий вариант, обратимо): контакт — «ранен» (Габ −5, остальные −3); бросок предмета −2; упор −1
       var cost = (how === 'strike' || how === 'spark') ? (hero === 'gab' ? 5 : 3) : how === 'throw' ? 2 : 1;
@@ -1499,7 +1499,8 @@
   };
   Game.prototype.arrestEnd = function () {
     var S = this.S, team = S.f.team, T = this.T.bind(this);
-    S.ended = true; S.phase = 'end';
+    S.ended = true; S.phase = 'end'; delete S.f.arrestDone;
+    S.season.rp = this.repute();
     var rest = ['gab', 'elf', 'mage', 'nobby'].filter(function (h) { return !(team && team.dec[h]); });
     var NOPLAYER = { gab: 'Габ молча протягивает руки.', elf: 'Эллион {e:мог|могла} бы назвать себя и уйти, но молчит.', mage: '%mage% шепчет что-то о судьбе.', nobby: 'Нобби идёт тихо и не поднимает глаз.' };
     var parts = ['Стража уводит всех четверых.'];
@@ -1511,17 +1512,38 @@
     this.say('— конец серии 1 «Таверна» —');
     this.s2Stub();
   };
+  // репутация у стражи (flags.md, вариант В, решение Алексея 1.10): ярлык и число в блоке «сезон», 2 знака: «b2»
+  // ярлык: t тихоня (покорность) · p болтун (уговоры) · g бегун (бег) · b брыкун (сопротивление) · x «по-разному» (голоса поровну);
+  // число — строгость стражи 0…3: покорность 0, уговоры 1, бег 2, упор 2, контакт/бросок 3; у отряда — максимум по героям
+  var RP_LABEL = { calm: 't', plead: 'p', run: 'g', resist: 'b' };
+  var RP_VOTERS = 'players'; // 'players' — ярлык по решениям игроков; 'all' — как в flags.md §1: герой без игрока голосует «тихоня»
+  Game.prototype.repute = function () {
+    var S = this.S, team = S.f.team, votes = {}, strict = 0;
+    (RP_VOTERS === 'all' ? ORDER : team.order).forEach(function (h) { var k = team.dec[h] ? team.dec[h].kind : 'calm'; votes[RP_LABEL[k]] = (votes[RP_LABEL[k]] || 0) + 1; });
+    ORDER.forEach(function (h) {
+      var d = team.dec[h]; if (!d) return;
+      strict = Math.max(strict, d.kind === 'calm' ? 0 : d.kind === 'plead' ? 1 : d.kind === 'run' ? 2 : (d.how === 'stand' ? 2 : 3));
+    });
+    var best = Object.keys(votes).sort(function (a, b) { return votes[b] - votes[a]; });
+    var label = best.length > 1 && votes[best[0]] === votes[best[1]] ? 'x' : best[0];
+    return label + strict;
+  };
+  // сколько байт занимает состояние: сцена (бюджет ≤ 900) и сезон (≤ 200); лимит Алисы — 1 КБ на объект (flags.md §3)
+  Game.prototype.stateBytes = function () {
+    var S = this.S, scene = {}; Object.keys(S).forEach(function (k) { if (k !== 'season') scene[k] = S[k]; });
+    return { scene: JSON.stringify(scene).length, season: JSON.stringify(S.season).length };
+  };
   // серия 2 («2Б»): выбор запоминается, реплику показываем заглушкой — серии 2 в бете нет
   Game.prototype.s2Stub = function () {
     var S = this.S, team = S.f.team, T = this.T.bind(this), notes = [];
     var LIZ = { resist: 'Вот {p:этот|эта}, ваша светлость! {p:Тот|Та}, что {p:брыкался|брыкалась}! Требую отдельную верёвку!', run: 'А {p:этот|эта} {p:бегал|бегала}, ваша светлость! В присутствии свидетелей!', calm: 'А {p:этот|эта} {p:шёл|шла} тихо, ваша светлость. Тихие — самые опасные, я их знаю!' };
-    var keep = S.pc; S.f.s2 = {};
+    var keep = S.pc, s2 = {};
     Object.keys(team.dec).forEach(function (h) {
-      var k = team.dec[h].kind; S.f.s2[h] = k; S.pc = h;
+      var k = team.dec[h].kind; s2[h] = k; S.pc = h;
       notes.push(k === 'plead' ? T('Герцог: — Капитан говорит, вы много говорили, {p:сударь|сударыня}. Теперь, с вашего позволения, говорить буду я.') : T('Лизард: — ' + LIZ[k]));
     });
     S.pc = keep;
-    this.notes = (this.notes || []).concat(['серия 2 — позже. Запомнено: ' + Object.keys(S.f.s2).map(function (h) { return h + ' — ' + S.f.s2[h]; }).join(', ') + '. Реплика-заглушка: ' + notes.join(' ')]);
+    this.notes = (this.notes || []).concat(['серия 2 — позже. Запомнено: ' + Object.keys(s2).map(function (h) { return h + ' — ' + s2[h]; }).join(', ') + '; репутация у стражи ' + S.season.rp + '. Реплика-заглушка: ' + notes.join(' ')]);
   };
 
   Game.prototype.viewState = function () {

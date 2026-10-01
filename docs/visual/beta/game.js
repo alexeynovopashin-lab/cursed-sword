@@ -135,6 +135,16 @@
     if (opt.bonusWhy) r.bonusWhy = opt.bonusWhy;
     this.rolls.push(r); return r;
   };
+  // бросок, который по сюжету удаётся при любом кубике: в панели «по сюжету», а не «провал»
+  Game.prototype.story = function (r, why) {
+    r.ok = true; r.forced = true; r.fumble = false; r.crit = false;
+    r.note = (r.note ? r.note + '; ' : '') + 'кубик не решает: по сюжету ' + why;
+    return r;
+  };
+  // действие без броска (навык героя): строка в панели «без броска», кубика нет
+  Game.prototype.auto = function (label, why) {
+    this.rolls.push({ label: label, auto: true, die: null, mod: null, dc: null, total: null, ok: true, note: why });
+  };
   Game.prototype.dmg = function (label, sides, bonus) {
     var n = 1 + Math.floor(rngNext(this.S) * sides);
     this.rolls.push({ label: label, die: n, mod: bonus || 0, dc: null, total: n + (bonus || 0), dmg: true, sides: sides });
@@ -308,13 +318,16 @@
     if (verb === 'climb' && A.behind && !A.dst) verb = 'hide';
     if (verb === 'use' && (A.person || A.target) && (A.item === 'milk' || (!A.item && S.held === 'milk'))) { A.item = 'milk'; A.target = A.target || A.person; verb = 'pour'; }
     else if (verb === 'use' && (A.person || A.target) && S.held && !A.item) { A.item = S.held; A.target = A.target || A.person; verb = 'throw'; }
+    if (S.phase === 'arrest' && !S.ended && CALM_WORDS.test(c.raw || '')) { verb = 'wait'; tr.note = 'арест: жест покорности по словам'; }
     if (!verb) {
       tr.note = 'глагол не найден';
-      var known = c.args.map(function (a) { return NAMES[this.resolveId(a.id)] || a.id; }, this);
-      if (known.length) { this.say('«' + cap(known[0]) + '»… и что ты хочешь с этим сделать?'); S.last = this.resolveId(c.args[0].id) || S.last; S.pending = { verb: null, A: A, ask: 'Что сделать?' }; }
+      var known = c.args.map(function (a) { var rid = this.resolveId(a.id); return rid ? (NAMES[rid] || rid) : null; }, this).filter(Boolean);
+      if (!known.length && c.args.length) this.say('Про кого или про что ты? Назови, например, «капитана» или «дверь».');
+      else if (known.length) { this.say('«' + cap(known[0]) + '»… и что ты хочешь с этим сделать?'); S.last = this.resolveId(c.args[0].id) || S.last; S.pending = { verb: null, A: A, ask: 'Что сделать?' }; }
       else this.say(this.pick(['Не понял{p:|а} тебя. Скажи иначе — например, «беру кружку» или «иду к стойке».', 'Это слишком загадочно даже для таверны. Опиши действие проще: что делаешь и с чем.']));
       return { done: false };
     }
+    if (S.phase === 'arrest' && !S.ended && verb !== 'look' && verb !== 'inv') return this.arrestAct(verb, A, c, tr);
     // цель по умолчанию
     tr.resolved = { verb: verb, item: A.item, person: A.person, target: A.target, dst: A.dst, with: A.with, src: A.src };
     var h = this['h_' + verb];
@@ -345,6 +358,17 @@
   // ---- обработчики -------------------------------------------------------
   function isPerson(id) { return id === 'host' || id === 'rowdy' || id === 'lizard' || id === 'guard' || id === 'crowd' || ORDER.indexOf(id) >= 0; }
   Game.prototype.weaponId = function () { return HEROES[this.S.pc].weapon; };
+  // оружие под рукой? меч/нож/лук — только если лежит у героя; в сундуке — нет (правило таверны)
+  Game.prototype.hasInHand = function (it) {
+    var S = this.S;
+    if (it !== 'sword' && it !== 'knife' && it !== 'bow' && it !== 'claws') return true;
+    return S.inv.indexOf(it) >= 0 || S.held === it;
+  };
+  Game.prototype.refuseNoWeapon = function (it) { // ТЕКСТ (черновик Беты, ждёт Диалоги/Геймплей)
+    this.spend(0);
+    this.say(NAMES[it] === 'меч' || it === this.weaponId() ? 'Оружие осталось в сундуке у двери — достать его можно только на выходе.' : 'У тебя такого нет.');
+    return { refuse: true };
+  };
 
   Game.prototype.look = function (id) {
     var S = this.S, w = S.w, T = this.T.bind(this), t;
@@ -597,8 +621,8 @@
   Game.prototype.liftChest = function () {
     var S = this.S, tries = S.f.chestTries || 0;
     if (S.held === 'chest') return true;
+    if (S.pc === 'gab') { this.auto('поднять сундук', 'Габ поднимает сундук без броска: сила 4 — самая большая в отряде'); return true; }
     var r = this.roll('поднять сундук', S.pc, 'str', 12, { bonus: tries * 2, bonusWhy: tries ? 'каждая попытка — на два легче (уже расшатал)' : '' });
-    if (S.pc === 'gab') r.ok = true;
     if (!r.ok) S.f.chestTries = tries + 1;
     return r.ok;
   };
@@ -625,7 +649,7 @@
     }
     if (it === 'purse') {
       if (S.pc === 'nobby') return this.steal_purse(A);
-      if (S.pc === 'gab') { this.spend(0); return this.say('Кошелёк и так при тебе.'); }
+      if (S.pc === 'gab') { this.spend(0); return this.say(S.w.purse === 'gab' ? 'Кошелёк и так при тебе.' : 'Кошелька уже нет.'); }
       this.say('Чужой кошелёк лучше не трогать — не то время.'); return;
     }
     if (it === 'book') { if (S.pc === 'mage') { this.say('Книга и так у тебя. На цепочке.'); return; } if (S.pc === 'nobby') return this.steal_book(A); this.say('Книга на цепочке — чужая.'); return; }
@@ -747,7 +771,7 @@
 
   Game.prototype.h_talk = function (A, c) {
     var S = this.S, to = A.person || A.target || A.company, speech = (c.speech || '').toLowerCase(), self = this;
-    if (!to && S.phase === 'arrest') to = 'lizard';
+    if (S.phase === 'arrest' && (!to || to === 'guard' || to === 'crowd' || to === 'host')) to = 'lizard';
     if (!to) { to = (S.phase === 'brawl') ? 'crowd' : 'host'; if (S.phase === 'evening') to = 'crowd'; }
     this.spend(1);
     var about = { sword: /меч/.test(speech + ' ' + c.raw), gold: /золот|денег|монет/.test(speech + ' ' + c.raw), name: /имя|зовут|кто ты/.test(speech + ' ' + c.raw), sorry: /извин|прости/.test(speech + ' ' + c.raw), dream: /сон|виде/.test(speech + ' ' + c.raw) };
@@ -814,7 +838,8 @@
     var S = this.S;
     this.spend(1);
     if (S.pc !== 'nobby') return this.say('Нет.');
-    var r = this.roll('срезать книгу', 'nobby', 'dex', 16, { bonus: A.manner && A.manner.careful ? 2 : 0, bonusWhy: 'осторожно' });
+    var r = this.roll('потянуться к книге — не выдать себя', 'nobby', 'dex', 16, { bonus: A.manner && A.manner.careful ? 2 : 0, bonusWhy: 'осторожно' });
+    r.note = 'книгу не украсть: «ещё не время» (по сюжету); бросок решает только — заметит ли маг';
     if (r.ok) { this.say('Нобби, ты знаешь себя: цепочка звякает — и маг рефлекторно хватается за книгу. Ты отдёргиваешь руку. Ещё не время.'); }
     else this.say('Ты касаешься цепочки — маг бледнеет и хватается за книгу: — Это знак! — Ты отходишь с невинным видом. «Пока не сегодня», — решает Нобби.');
     S.f.eyeBook = true;
@@ -825,6 +850,7 @@
     var S = this.S, tgt = A.person || A.target || A.company || null, item = A.with || (A.item && !isPerson(A.item) ? A.item : null);
     if (A.item && !isPerson(A.item) && !A.with) item = A.item;
     if (item === 'weapon') item = this.weaponId();
+    if (item && !this.hasInHand(item) && S.phase !== 'door') return this.refuseNoWeapon(item);
     if (!tgt) {
       tgt = (S.phase === 'brawl' || S.phase === 'arrest') ? (S.w.lizard.down ? 'rowdy' : 'lizard') : null;
       if (!tgt) { this.say('Кого бить? Пока никто не заслужил. Или заслужил, но по-тихому.'); S.pending = { verb: 'hit', A: A, ask: 'Кого?' }; return { ok: false }; }
@@ -851,6 +877,7 @@
     if (it && isPerson(it)) { tgt = tgt || it; it = S.held; }
     if (!it) { this.say('Что бросить?'); S.pending = { verb: 'throw', A: A, ask: 'Что бросить?' }; return { ok: false }; }
     if (it === 'weapon') it = this.weaponId();
+    if (!this.hasInHand(it) && S.phase !== 'door' && S.phase !== 'evening') return this.refuseNoWeapon(it);
     if (!tgt) tgt = (S.phase === 'brawl') ? (S.w.lizard.down ? 'rowdy' : 'lizard') : null;
     if (!tgt) { this.say('Куда бросать? Здесь пока никто не заслужил.'); S.pending = { verb: 'throw', A: A, ask: 'Куда?' }; return { ok: false }; }
     if (S.phase === 'door' || S.phase === 'evening') { this.spend(0); return this.say('Ты пока не в драке. Метать вещи в таверне без повода — плохая примета: и для вещей, и для хозяина.'); }
@@ -913,9 +940,9 @@
     if (S.pc !== 'mage') { this.spend(1); return this.say('Ты перевязываешь свою царапину плащом. Спасибо и на том.'); }
     if (S.mana < 1) { this.spend(1); return this.say('Силы кончились.'); }
     this.spend(1); S.mana--;
-    var r = this.roll('лечение', 'mage', 'int', 8, { bonusWhy: 'интеллект' });
-    var d = this.dmg('лечит', 6, 2); var h = HEROES[who] ? HEROES[who].hp : 8;
-    if (HEROES[who]) S.hp[who] = Math.min(h, S.hp[who] + d);
+    this.auto('лечение', 'навык мага, без броска: лечит всегда, тратит 1 силу');
+    var h = HEROES[who] ? HEROES[who].hp : 8;
+    if (HEROES[who] && S.hp[who] < h) { var d = this.dmg('лечит', 6, 2); S.hp[who] = Math.min(h, S.hp[who] + d); }
     this.say(who === 'mage' ? 'Ты кладёшь руки на ушибленное плечо — тепло. Тише. Дыши.' : this.T('Ты кладёшь руки на %' + who + '+% — тепло. «Тише. Дыши. Я здесь». %' + who + '% удивлённо моргает.'));
   };
   Game.prototype.h_use = function (A) { this.spend(1); this.say('Ты пробуешь использовать ' + (NAMES[A.item] || 'это') + ' — но здесь не совсем то место.'); };
@@ -1058,11 +1085,14 @@
   Game.prototype.beatPurse = function (byPC, A) {
     var S = this.S, w = S.w; S.beat = 3; S.t = 0; S.f.purse = true;
     S.pos.nobby = 'hall'; w.purse = 'nobby';
+    S.inv = S.inv.filter(function (x) { return x !== 'purse'; });
+    if (S.pc === 'nobby') S.inv.push('purse');
     if (byPC) {
       this.spend(1);
       var careful = S.t > 0 || (A && A.manner && A.manner.careful);
-      var r = this.roll('срезать кошелёк', 'nobby', 'dex', 12, { adv: !!(A && A.manner && A.manner.careful), bonus: (A && A.manner && A.manner.hasty) ? -2 : 0, bonusWhy: A && A.manner && A.manner.hasty ? 'торопливо' : (A && A.manner && A.manner.careful ? 'осторожно' : '') });
+      var r = this.roll('срезать кошелёк — тихо?', 'nobby', 'dex', 12, { adv: !!(A && A.manner && A.manner.careful), bonus: (A && A.manner && A.manner.hasty) ? -2 : 0, bonusWhy: A && A.manner && A.manner.hasty ? 'торопливо' : (A && A.manner && A.manner.careful ? 'осторожно' : '') });
       S.f.purseClean = r.ok;
+      r.note = (r.note ? r.note + '; ' : '') + 'кошелёк срезан в любом случае (по сюжету); бросок решает — тихо или шумно';
       var line;
       if (r.ok) line = 'Ты скользишь между столами, как тёплый сквозняк. Раз — и кошелёк исчез вместе с ремешком; мечник даже не моргнул.';
       else line = 'Ты срезаешь кошелёк — и слишком громко: мечник хмурится и поворачивает голову. Ты уже в двух шагах, уже под чужой рукой, уже бежишь.';
@@ -1095,12 +1125,15 @@
     // ход NPC-героя: фирменный приём
     var sq = b.sigQueue, who;
     while (sq.length && ((who = sq[0]) && ((who === 'gab' && b.done.table) || (who === 'mage' && b.done.fire) || (who === 'nobby' && b.done.milk) || (who === 'elf' && b.done.fork)))) sq.shift();
-    if (sq.length && b.round < b.guardsAt) {
+    // миска в руках у героя — Нобби дожидается, пока её бросят (одна миска на всех)
+    var blocked = function (h) { return h === 'nobby' && S.held === 'milk'; };
+    for (var bi = 0; bi < sq.length && blocked(sq[0]); bi++) sq.push(sq.shift());
+    if (sq.length && b.round < b.guardsAt && !blocked(sq[0])) {
       who = sq.shift();
       var kind = { gab: 'table', mage: 'fire', nobby: 'milk', elf: 'fork' }[who];
       var sigs = { table: 'str', fire: 'int', milk: 'dex', fork: 'dex' }[kind];
       var r = this.roll(this.gname(who) + ' — приём', who, sigs, 10, { attack: who === 'elf', bonusWhy: 'приём героя' });
-      if (!r.ok) { r.ok = true; r.forced = true; r.note = (r.note ? r.note + '; ' : '') + 'кубик не решает: по сюжету приём удаётся'; }
+      if (!r.ok) this.story(r, 'приём удаётся');
       if (kind === 'table') { w.lizard.table = true; b.done.table = true; S.w.tableUp = true; }
       if (kind === 'fire') { w.lizard.moustache = true; b.done.fire = true; if (who === S.pc) S.mana--; }
       if (kind === 'milk') { w.lizard.milk = true; b.done.milk = true; w.milk = 'gone'; }
@@ -1124,7 +1157,8 @@
     this.say(held ? 'К этому моменту посреди зала стоят четверо — а остальные лежат, сидят, сползли под столы. Драка выиграна, и это, кажется, не радует никого.' : 'К этому моменту вы четверо сидите на полу в куче табуреток и не очень понимаете, кто победил. Скорее всего — табуреты.');
     var bits = [];
     if (w.lizard.table) bits.push('стол пролетел мимо');
-    var cap = 'Капитан Лизард стоит посреди зала: '; var pieces = [];
+    var cap = (w.lizard.down ? (w.lizard.fork ? 'Капитан Лизард сидит под стеной, оглушённый: ' : 'Капитан Лизард сидит на полу, оглушённый: ')
+      : (w.lizard.fork ? 'Капитан Лизард у стены: ' : 'Капитан Лизард стоит посреди зала: ')); var pieces = [];
     pieces.push('весь мокрый');
     if (w.lizard.moustache) pieces.push('усы дымятся и подпалены');
     if (w.lizard.milk) pieces.push('по мундиру течёт молоко');
@@ -1142,8 +1176,47 @@
     this.say('(Что ты скажешь или сделаешь?)');
     S.sub = 9;
   };
+  // Арест: один выбор игрока решает, как их уведут. Серия кончается так же (крючок про герцога), но исход разный.
+  // ТЕКСТ — черновик Беты: строки ARREST ждут Диалоги; крючок и реплики капитана — из season1.md.
+  var ARREST_KIND = {
+    hit: 'resist', kick: 'resist', swing: 'resist', throw: 'resist', shoot: 'resist', cast: 'resist', shove: 'resist', pour: 'resist', fight: 'resist', break: 'resist',
+    flee: 'run', hide: 'run', climb: 'run', go: 'run', push: 'run', pull: 'run',
+    talk: 'plead', give: 'plead', treat: 'plead',
+    wait: 'calm', put: 'calm', sit: 'calm', stand: 'calm', block: 'calm', cover: 'calm', lock: 'calm', close: 'calm'
+  };
+  var CALM_WORDS = /сда[юё]сь|подним\S* рук|руки (вверх|поднял)|на колен|не сопротивл|без (боя|сопротивл)|иду с (ними|вами|стражей)|веди(те)?\b/i;
+  var ARREST = {
+    calm: 'Ты не мешаешь — так быстрее и всем проще. Стража ведёт вас, не толкая.',
+    resist: 'Тебя скручивают, не церемонясь, и ведут; плечо ноет до самой решётки.',
+    run: 'Копьё в спину быстро объясняет, куда идти. Вас связывают одной верёвкой на всех.',
+    plead: 'Слова пропадают впустую: капитан орёт громче. Вас уводят, не дослушав.',
+    idle: 'Стража не даёт отвлекаться: копьё упирается тебе в плечо. (Что ты скажешь или сделаешь? Можно сдаться, сказать слово, дёрнуться или бежать.)'
+  };
+  Game.prototype.arrestAct = function (verb, A, c, tr) {
+    var S = this.S, kind = ARREST_KIND[verb] || 'idle';
+    if (S.f.arrest) return { ok: false }; // решение уже принято в этом ходу: первое действие в цепочке решает
+    if (verb === 'go' && A.company) kind = 'calm';
+    tr.note = (tr.note ? tr.note + '; ' : '') + 'арест: ' + kind;
+    tr.resolved = { verb: verb, arrest: kind };
+    if (kind === 'idle') {
+      S.f.arrestIdle = (S.f.arrestIdle || 0) + 1;
+      if (S.f.arrestIdle < 3) { this.say(ARREST.idle); return { ok: false }; }
+      kind = 'calm';
+    }
+    S.f.arrest = kind; this.spend(1);
+    if (kind === 'resist') {
+      this.say('Ты пытаешься ударить — и в тот же миг древко копья подсекает тебе ноги. Драка кончилась.');
+      S.hp[S.pc] = Math.max(1, S.hp[S.pc] - 2);
+    } else if (kind === 'plead') {
+      this.h_talk(A, c);
+    } else if (kind === 'run') {
+      this.say('Ты кидаешься прочь — и упираешься в копья: бежать некуда, вокруг стража.');
+    }
+    return { done: true, verb: verb };
+  };
   Game.prototype.arrestEnd = function () {
     var S = this.S; S.ended = true; S.phase = 'end';
+    this.say(ARREST[S.f.arrest || 'calm']);
     this.say(this.T('Решётка лязгает. Кошелёк так и лежит у Вора за пазухой. Где-то наверху стражник говорит:\n— Герцог хочет их видеть. Лично.'));
     this.say('— конец серии 1 «Таверна» —');
   };

@@ -177,5 +177,195 @@ var SCRIPTS = {
   ok(g.S.queue.length >= 1, 'больше трёх действий уходят в очередь «дальше»', JSON.stringify(g.S.queue));
 })();
 
+
+// ======================================================================
+// Шаг 1 «честный кубик и согласованный мир» (находки теста 1: 4–13, 18)
+// ======================================================================
+var ALL = ['gab', 'elf', 'mage', 'nobby'];
+var OPEN = { gab: [], elf: ['кладу лук в сундук'], mage: ['кладу нож в сундук'], nobby: ['кладу нож в сундук'] };
+function gameOf(pc, seed, gender) { var o = {}; o[pc] = gender || 'm'; return new G({ pc: pc, seed: seed, genders: o }); }
+function allText(g) { return g.turns.map(function (t) { return t.text.join('\n'); }).join('\n'); }
+// ход вперёд до фазы (или до конца ходов)
+function advance(g, phase, max) { for (var i = 0; i < (max || 40) && g.S.phase !== phase && !g.S.ended; i++) g.input('жду'); return g.S.phase === phase; }
+function toArrest(pc, seed) { var g = gameOf(pc, seed); OPEN[pc].forEach(function (l) { g.input(l); }); advance(g, 'arrest'); return g; }
+function isRollOk(r) { return r.die === 20 || (r.die !== 1 && r.total >= r.dc); }
+
+// случайные партии: инварианты мира и кубика (одни и те же зёрна — на старом и на новом коде)
+var POOL = ['беру молоко', 'беру кружку', 'пью молоко', 'бью капитана мечом', 'достаю меч из сундука', 'бью задиру', 'бью капитана', 'бросаю вилку в капитана',
+  'закрываюсь столом', 'подпираю дверь сундуком', 'беру сундук', 'лечу Габа', 'жгу усы капитану', 'срезаю кошелёк', 'срезаю книгу', 'швыряю миску молока в капитана',
+  'прячусь под стол', 'жду', 'жду', 'угощаю всех', 'кладу лук в сундук', 'кладу нож в сундук', 'подсаживаюсь к меченосцу', 'беру стол', 'иду к стойке', 'беру табурет'];
+function fuzz(pcs, seeds, check) {
+  var bad = {};
+  pcs.forEach(function (pc) {
+    for (var seed = 1; seed <= seeds; seed++) {
+      var g = gameOf(pc, seed * 7 + 3), rnd = seed * 2654435761 >>> 0;
+      for (var i = 0; i < 45 && !g.S.ended; i++) {
+        rnd = (Math.imul(rnd, 1664525) + 1013904223) >>> 0;
+        var before = JSON.stringify(g.S);
+        g.input(POOL[rnd % POOL.length]);
+        var t = g.turns[g.turns.length - 1];
+        check(g, t, bad, pc + '/' + (seed * 7 + 3) + '#' + t.n + ' «' + t.input + '»', JSON.parse(before));
+      }
+    }
+  });
+  return bad;
+}
+function firstBad(bad, key) { var k = Object.keys(bad[key] || {}); return (bad[key] ? k.length + ' шт, например ' + k[0] : ''); }
+function note(bad, key, where) { (bad[key] = bad[key] || {})[where] = 1; }
+var FZ = fuzz(ALL, 60, function (g, t, bad, where, was) {
+  var S = g.S, w = S.w;
+  t.rolls.forEach(function (r) {
+    if (r.dmg || r.auto || r.dc == null) return;
+    if (r.forced) { if (!r.ok || r.fumble || r.crit || !/по сюжету/.test(r.note || '')) note(bad, 'forced', where + ' ' + JSON.stringify(r)); }
+    else if (r.ok !== isRollOk(r)) note(bad, 'honest', where + ' ' + r.label + ' ' + r.die + '+' + r.mod + '/' + r.dc + ' ok=' + r.ok);
+  });
+  if ((S.pc === 'nobby' || S.pc === 'gab') && (S.inv.indexOf('purse') >= 0) !== (w.purse === S.pc)) note(bad, 'purse', where + ' inv=' + S.inv + ' purse=' + w.purse);
+  if (S.held === 'milk' && w.milk === 'gone') note(bad, 'milk', where);
+  if (['sword', 'knife', 'bow'].indexOf(S.held) >= 0 && S.inv.indexOf(S.held) < 0) note(bad, 'heldweapon', where + ' held=' + S.held);
+  var txt = t.text.join('\n');
+  if (w.lizard.down && /Капитан Лизард стоит/.test(txt)) note(bad, 'lizard', where);
+  if (/@/.test(txt)) note(bad, 'at', where);
+  // меч в сундуке — меч не бьёт
+  if (/мечом/.test(t.input) && /бью|бьёт/.test(t.input) && S.weaponIn && was.w.lizard.hp !== w.lizard.hp) note(bad, 'sword', where);
+  // лечение: что-то лечится только по состоянию, а не по тексту «мимо»
+  t.rolls.forEach(function (r) { if (/лечение/.test(r.label) && r.dc != null) note(bad, 'healroll', where); });
+});
+ok(!FZ.forced, 'находка 8: «по сюжету» — не провал и не крит (в панели)', firstBad(FZ, 'forced'));
+ok(!FZ.honest, 'находка 6/7: исход броска = кубик + модификатор против порога, без тихих поправок', firstBad(FZ, 'honest'));
+ok(!FZ.purse, 'находка 4: кошелёк в инвентаре = кошелёк у героя в мире', firstBad(FZ, 'purse'));
+ok(!FZ.milk, 'находка 5: миска, ушедшая капитану, не остаётся в руках', firstBad(FZ, 'milk'));
+ok(!FZ.heldweapon, 'находка 13: в руках только то, что есть в инвентаре', firstBad(FZ, 'heldweapon'));
+ok(!FZ.lizard, 'находка 12: оглушённый капитан не «стоит»', firstBad(FZ, 'lizard'));
+ok(!FZ.at, 'находка 10: служебных меток в тексте нет', firstBad(FZ, 'at'));
+ok(!FZ.sword, 'находка 13: меч в сундуке — удар мечом не проходит', firstBad(FZ, 'sword'));
+ok(!FZ.healroll, 'находка 9: лечение не бросается против порога, а текст — успех', firstBad(FZ, 'healroll'));
+
+// 4: кошелёк после кражи — у вора в инвентаре и на экране, у Габа — нет (зерно 202/909 из отчёта)
+(function () {
+  var g = play('nobby', 'm', OPEN.nobby.concat(['жду', 'жду', 'срезаю кошелёк']), 909);
+  ok(g.S.w.purse === 'nobby' && g.S.inv.indexOf('purse') >= 0 && /кошелёк/.test(g.invText()), 'кража: кошелёк у вора в инвентаре и в «что у меня»', g.invText());
+  var h = gameOf('gab', 202); for (var i = 0; i < 12 && h.S.w.purse === 'gab'; i++) h.input('жду');
+  ok(h.S.w.purse === 'nobby' && h.S.inv.indexOf('purse') < 0 && !/кошелёк/.test(h.invText()), 'кражу совершил Нобби — у Габа кошелька нет ни в инвентаре, ни в «что у меня»', h.invText());
+})();
+// 6: бросок кражи отвечает на вопрос «тихо ли?», а не «получилось ли» — кража по сюжету удаётся в обоих случаях
+(function () {
+  var quiet = 0, loud = 0;
+  for (var seed = 1; seed <= 40; seed++) {
+    var g = play('nobby', 'm', OPEN.nobby.concat(['жду', 'жду', 'срезаю кошелёк']), seed);
+    var r = g.turns[g.turns.length - 1].rolls.filter(function (x) { return /кошелёк/.test(x.label); })[0];
+    if (!r) continue;
+    ok(/тихо/.test(r.label) && g.S.w.purse === 'nobby', 'кража: бросок «тихо ли?», кошелёк у вора при любом исходе (зерно ' + seed + ')', r.label);
+    var tx = g.turns[g.turns.length - 1].text.join(' ');
+    if (r.ok) { quiet++; ok(/не моргнул/.test(tx), 'тихая кража — «не моргнул» (зерно ' + seed + ')'); }
+    else { loud++; ok(/слишком громко/.test(tx), 'шумная кража — «слишком громко» (зерно ' + seed + ')'); }
+  }
+  ok(quiet > 0 && loud > 0, 'за 40 зёрен были и тихая, и шумная кража', quiet + '/' + loud);
+})();
+// 6б: книга мага — бросок не называет «успехом» то, чего не происходит
+(function () {
+  for (var seed = 1; seed <= 30; seed++) {
+    var g = play('nobby', 'm', OPEN.nobby.concat(['срезаю книгу']), seed);
+    var r = g.turns[g.turns.length - 1].rolls[0];
+    if (!r) continue;
+    ok(!/срезать/.test(r.label) && g.S.w.book === 'mage', 'книга: бросок не «срезать», книга остаётся у мага (зерно ' + seed + ')', r.label);
+  }
+})();
+// 7: Габ поднимает сундук без броска (в панели — «без броска»), у остальных кубик решает честно
+(function () {
+  var fake = 0, autos = 0;
+  for (var seed = 1; seed <= 60; seed++) {
+    var g = play('gab', 'm', ['беру сундук'], seed);
+    g.turns[0].rolls.forEach(function (r) { if (r.dc != null && !r.forced && r.ok && r.total < r.dc && r.die !== 20) fake++; if (r.auto) autos++; });
+    ok(g.S.held === 'chest', 'Габ поднимает сундук (зерно ' + seed + ')');
+  }
+  ok(fake === 0, 'Габ: ни одного «успеха» с суммой ниже порога', fake + ' из 60');
+  ok(autos === 60, 'Габ: подъём сундука показан в панели как «без броска»', autos + ' из 60');
+  var weak = 0, strong = 0;
+  for (var s2 = 1; s2 <= 60; s2++) { var m = play('mage', 'm', OPEN.mage.concat(['беру сундук']), s2); if (m.S.held === 'chest') strong++; else weak++; }
+  ok(weak > 0 && strong > 0, 'маг поднимает сундук не всегда: кубик решает', strong + ' из 60');
+})();
+// 9: лечение — без броска против порога; лечит только раненого
+(function () {
+  var g = play('mage', 'm', OPEN.mage.concat(['жду', 'лечу Габа']), 606);
+  var last = g.turns[g.turns.length - 1];
+  ok(last.rolls.every(function (r) { return r.dc == null; }), 'лечение не бросает d20 против порога (зерно 606 из отчёта)', JSON.stringify(last.rolls));
+  var h = gameOf('mage', 5); OPEN.mage.forEach(function (l) { h.input(l); }); h.S.hp.gab = 5; h.input('лечу Габа');
+  ok(h.S.hp.gab > 5, 'раненого Габа лечение поднимает', String(h.S.hp.gab));
+})();
+// 5: миска, брошенная героем-вором ходом приёма, не остаётся в руках у героя
+(function () {
+  var g = gameOf('elf', 202); OPEN.elf.forEach(function (l) { g.input(l); });
+  g.input('иду к стойке'); g.input('беру молоко'); ok(g.S.held === 'milk', 'эльф взял миску молока');
+  advance(g, 'arrest');
+  ok(g.S.w.milk === 'gone' ? g.S.held !== 'milk' : true, 'миска ушла капитану — в руках её нет', 'held=' + g.S.held + ' milk=' + g.S.w.milk);
+})();
+// 12: арест — оглушённый капитан сидит, приколотый — у стены; «стоит посреди зала» только на ногах
+(function () {
+  function arrestText(down, fork) {
+    var g = play('gab', 'm', ['жду', 'жду']);
+    g.S.phase = 'brawl'; g.S.beat = 4; g.S.w.lizard.down = down; g.S.w.lizard.fork = fork; g.S.b.round = g.S.b.guardsAt - 1; g.S.b.sigQueue = [];
+    g.input('жду'); return g.turns[g.turns.length - 1].text.join(' ');
+  }
+  ok(!/стоит посреди зала/.test(arrestText(true, false)) && /оглушённый/.test(arrestText(true, false)), 'арест: оглушённый капитан сидит, не стоит');
+  ok(!/стоит посреди зала/.test(arrestText(false, true)) && /приколот/.test(arrestText(false, true)), 'арест: капитан, приколотый вилкой, не стоит посреди зала');
+  ok(/стоит посреди зала/.test(arrestText(false, false)), 'арест: целый капитан стоит посреди зала');
+})();
+// 13: меч в сундуке — бить им нельзя; кубик не брошен, чужого меча тоже нет
+(function () {
+  var g = gameOf('gab', 303); advance(g, 'brawl');
+  var hp = g.S.w.lizard.hp, rolls0 = g.turns.length;
+  g.input('бью капитана мечом');
+  var t = g.turns[g.turns.length - 1];
+  ok(g.S.w.lizard.hp === hp && !t.rolls.some(function (r) { return /удар/.test(r.label); }), 'меч в сундуке: удар мечом не проходит, кубика нет', JSON.stringify(t.rolls));
+  ok(/сундук/.test(t.text.join(' ')), 'меч в сундуке: игра говорит, где меч', t.text.join(' '));
+  var e = gameOf('elf', 303); OPEN.elf.forEach(function (l) { e.input(l); }); advance(e, 'brawl');
+  var h0 = e.S.w.lizard.hp; e.input('бью капитана мечом');
+  ok(e.S.w.lizard.hp === h0, 'чужой меч (эльф): удар мечом не проходит');
+  var n = gameOf('nobby', 303); OPEN.nobby.concat(['жду', 'жду']).forEach(function (l) { n.input(l); }); advance(n, 'brawl');
+  var nh = n.S.w.lizard.hp; n.input('бью капитана когтями'); ok(true, 'когти (есть в инвентаре) не падают');
+})();
+// 10: «его» без предшественника — вопрос по-русски, не служебная метка
+ALL.forEach(function (pc) {
+  var g = gameOf(pc, 1); g.input('я сначала попробую его отвлечь, а потом ударю');
+  var tx = allText(g);
+  ok(!/@/.test(tx) && /что|кого|кто/i.test(tx), 'свежая сцена, «его» без предшественника: ' + pc, tx);
+});
+// 18: арест — сцена, где выбор влияет на исход
+(function () {
+  var ENDS = {};
+  [['resist', 'бью капитана'], ['run', 'бегу к двери'], ['plead', 'говорю капитану: простите, это недоразумение'], ['calm', 'молчу и не сопротивляюсь']].forEach(function (p) {
+    var g = toArrest('gab', 11); var hp0 = g.S.hp.gab;
+    ok(g.S.phase === 'arrest' && !g.S.ended, 'арест начался, серия ещё идёт (' + p[0] + ')', g.S.phase);
+    g.input(p[1]);
+    var tx = g.turns[g.turns.length - 1].text.join(' ');
+    ok(g.S.ended && g.S.f.arrest === p[0], 'выбор «' + p[0] + '» записан в мир и закрывает серию', JSON.stringify(g.S.f.arrest) + ' ended=' + g.S.ended);
+    ok(/Герцог хочет их видеть/.test(tx), 'крючок серии на месте при выборе «' + p[0] + '»');
+    ENDS[p[0]] = tx;
+    if (p[0] === 'resist') ok(g.S.hp.gab < hp0, 'сопротивление стоит здоровья', hp0 + ' → ' + g.S.hp.gab);
+    else ok(g.S.hp.gab === hp0, 'без сопротивления здоровье цело (' + p[0] + ')');
+  });
+  var uniq = {}; Object.keys(ENDS).forEach(function (k) { uniq[ENDS[k]] = 1; });
+  ok(Object.keys(uniq).length === 4, 'четыре выбора — четыре разных исхода в тексте', String(Object.keys(uniq).length));
+  var g = toArrest('gab', 11); g.input('ем вилку');
+  ok(!g.S.ended && g.S.phase === 'arrest', 'арест: «ем вилку» не закрывает серию', 'ended=' + g.S.ended);
+  g.input('пью пиво'); g.input('читаю меню');
+  ok(g.S.ended && g.S.f.arrest === 'calm', 'арест: без решения стража теряет терпение за три отвлечения', JSON.stringify(g.S.f.arrest));
+  ALL.forEach(function (pc) {
+    var h = toArrest(pc, 5); h.input('бью капитана');
+    ok(h.S.ended && h.S.f.arrest === 'resist', 'арест, сопротивление, герой ' + pc, JSON.stringify(h.S.f.arrest));
+  });
+})();
+
+// 18б: жесты покорности понятны; в цепочке решает первое действие
+(function () {
+  ['сдаюсь', 'поднимаю руки', 'падаю на колени', 'не сопротивляюсь', 'иду с ними', 'сдаю оружие'].forEach(function (ph) {
+    var g = toArrest('gab', 11); g.input(ph);
+    ok(g.S.ended && g.S.f.arrest === 'calm', 'арест: «' + ph + '» — покорность', JSON.stringify(g.S.f.arrest) + ' ended=' + g.S.ended);
+  });
+  var g = toArrest('gab', 11); g.input('бью капитана, потом сдаюсь');
+  ok(g.S.f.arrest === 'resist', 'арест: в цепочке решает первое действие', JSON.stringify(g.S.f.arrest));
+  var h = toArrest('gab', 11); var hp = h.S.hp.gab; h.input('бью капитана и бью капитана'); ok(h.S.hp.gab === hp - 2, 'арест: здоровье списано один раз за ход', hp + ' → ' + h.S.hp.gab);
+})();
+
 console.log('\nПроверок: ' + total + ', упало: ' + fails);
 process.exit(fails ? 1 : 0);

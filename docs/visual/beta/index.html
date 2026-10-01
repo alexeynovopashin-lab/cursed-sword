@@ -213,7 +213,7 @@ function renderDice(){
   var last = null;
   for(var i=game.turns.length-1;i>=0 && !last;i--){ var rs=game.turns[i].rolls.filter(function(r){return r.dc!=null;}); if(rs.length) last = rs[rs.length-1]; }
   if(!last){ $('dice').innerHTML='<div class="dtxt">Бросков пока не было. Кубик d20 включается, когда исход не очевиден.</div>'; return; }
-  $('dice').innerHTML = '<div class="d20"><svg viewBox="0 0 64 64"><polygon points="32,3 58,18 58,46 32,61 6,46 6,18" fill="#241d16" stroke="'+(last.ok?'#6fbf80':'#d0604a')+'" stroke-width="2"/></svg><span>'+last.die+'</span></div><div class="dtxt"><b>'+esc(last.label)+'</b><br>'+last.die+(last.mod>=0?' + ':' − ')+Math.abs(last.mod)+' = '+last.total+' против '+last.dc+'<br><b class="'+(last.ok?'good':'bad')+'">'+(last.crit?'критический успех':last.fumble?'критический промах':last.ok?'успех':'неудача')+'</b></div>';
+  $('dice').innerHTML = '<div class="d20"><svg viewBox="0 0 64 64"><polygon points="32,3 58,18 58,46 32,61 6,46 6,18" fill="#241d16" stroke="'+(last.ok?'#6fbf80':'#d0604a')+'" stroke-width="2"/></svg><span>'+last.die+'</span></div><div class="dtxt"><b>'+esc(last.label)+'</b><br>'+last.die+(last.mod>=0?' + ':' − ')+Math.abs(last.mod)+' = '+last.total+' против '+last.dc+'<br><b class="'+(last.ok?'good':'bad')+'">'+(last.forced?'по сюжету (кубик не решает)':last.crit?'критический успех':last.fumble?'критический промах':last.ok?'успех':'неудача')+'</b></div>';
 }
 function renderSide(){
   var v = game.viewState(), S = game.S;
@@ -255,8 +255,9 @@ function renderEng(){
     h += '<h3>3. Броски</h3>';
     if(r.rolls.length){
       h += '<table class="rt"><tr><th>что</th><th>d20</th><th>мод</th><th>итог</th><th>порог</th><th></th></tr>'+r.rolls.map(function(x){
+        if(x.auto) return '<tr><td>'+esc(x.label)+(x.note?'<div class="dtxt">'+esc(x.note)+'</div>':'')+'</td><td>—</td><td>—</td><td>—</td><td>—</td><td class="good">без броска</td></tr>';
         if(x.dmg) return '<tr><td>'+esc(x.label)+' (d'+x.sides+')</td><td>'+x.die+'</td><td>'+(x.mod>=0?'+':'')+x.mod+'</td><td>'+x.total+'</td><td>—</td><td>урон</td></tr>';
-        return '<tr><td>'+esc(x.label)+(x.bonusWhy?'<div class="dtxt">'+esc(x.bonusWhy)+'</div>':'')+(x.note?'<div class="dtxt">'+esc(x.note)+'</div>':'')+'</td><td>'+x.die+'</td><td>'+(x.mod>=0?'+':'')+x.mod+' <span class="dtxt">'+x.stat+'</span></td><td>'+x.total+'</td><td>'+x.dc+'</td><td class="'+(x.ok?'good':'bad')+'">'+(x.crit?'крит.':x.fumble?'провал':x.ok?'успех':'мимо')+'</td></tr>';
+        return '<tr><td>'+esc(x.label)+(x.bonusWhy?'<div class="dtxt">'+esc(x.bonusWhy)+'</div>':'')+(x.note?'<div class="dtxt">'+esc(x.note)+'</div>':'')+'</td><td>'+x.die+'</td><td>'+(x.mod>=0?'+':'')+x.mod+' <span class="dtxt">'+x.stat+'</span></td><td>'+x.total+'</td><td>'+x.dc+'</td><td class="'+(x.ok?'good':'bad')+'">'+(x.forced?'по сюжету':x.crit?'крит.':x.fumble?'провал':x.ok?'успех':'мимо')+'</td></tr>';
       }).join('')+'</table>';
     } else h += '<div class="dtxt">без бросков</div>';
     h += '<h3>4. Что изменилось в мире</h3>';

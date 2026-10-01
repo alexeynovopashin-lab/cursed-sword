@@ -43,6 +43,9 @@ AVOID: photorealism, 3D render, bishonen, pretty-boy face, broken or bent sword,
 
 ## 2. Эллион (Ивар)
 
+Правка 1.10 (по решению Алексея 30.09, «2 Эллион Ж»): по умолчанию — эльфийка;
+в «Коротко» формы женского рода. Какой пол на листе 27.09 — не сверял.
+
 ```
 Character design reference sheet, one large page. STYLE: hand-painted watercolor and ink illustration, storybook fantasy, soft muted palette (dark green, silver-grey, oak brown, cream, a touch of gold), cream parchment paper background with light watercolor washes, hand-drawn thin ink frames with rounded corners, handwritten Russian captions in dark brown ink, small simple line icons, warm soft lighting, same style for every panel, not photorealistic, not 3D.
 
@@ -59,7 +62,7 @@ Face grid: «Восхитительно!» (про грязь, дождь, по�
 Story panel title «Тетрадка»: «— Что ты там записываешь? — "Пиво пьют, чтобы было весело. Потом им грустно. Дикари"».
 Прошлое: «Сбежала из дворца — сорок раз» · «На уроке мажет нарочно: "Мишень не двигается. Скучно"» · «За ней идёт королевская стража».
 Формы по полу: «принц» · «принцесса» · «"Эллион" — для обоих».
-Коротко: «эльф» · «наследник трона, сбежал от скуки» · «лучник / ассасин, невидимость» · «годы не считает» · «хочет вернуть долг Нобби».
+Коротко: «эльфийка» · «наследница трона, сбежала от скуки» · «лучник / ассасин, невидимость» · «годы не считает» · «хочет вернуть долг Нобби».
 Vignettes: «Платит золотым за кружку пива» · «Пишет в тетрадку» · «Прячется за спиной Габа» · «Под дождём — счастлива».
 
 HEIGHT CHART (strict): four silhouettes labeled «Габ» «Эльф» «Луциан» «Нобби». Gab tallest, about 190 cm, broad. Elf slender, about 180 cm, half a head shorter than Gab, taller than Lucian. Lucian average, about 170 cm, slightly chubby. Nobby shortest, about 150 cm, reaches Gab's chest, thin wiry HUMAN boy, not a dwarf, not stocky.

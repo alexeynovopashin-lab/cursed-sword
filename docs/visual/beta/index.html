@@ -31,6 +31,9 @@ button.small{font-size:12px;padding:2px 8px}
 body.dbg .trace{display:block}
 .sys{color:var(--muted);font-style:italic}
 .narr{white-space:pre-wrap}
+.draftmark{font-size:11px;color:var(--draft);opacity:.85;margin:2px 0 8px}
+.stub{color:var(--draft)}
+.pl2{font-size:12px;opacity:.8;margin-left:6px}
 .intro{color:#cbbf9f}
 .end{margin:20px 0;padding:12px 16px;border:1px solid var(--gold);border-radius:10px;background:#1f1811}
 form.inp{display:flex;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:#120f0c}
@@ -155,7 +158,7 @@ table.rt th{color:var(--muted);font-weight:400}
 'use strict';
 var H = CS.Game.HEROES, ORDER = CS.Game.ORDER, NAMES = CS.Game.NAMES;
 var PORT = { gab:'../img/gabriel.webp', elf:'../img/ellion.webp', mage:'../img/lucian.webp', nobby:'../img/nobby.webp' };
-var game = null, cfg = { pc:'gab', genders:{gab:'m',elf:'m',mage:'m',nobby:'m'} }, sel = 0;
+var game = null, cfg = { pc:'gab', players:[], genders:{gab:'m',elf:'f',mage:'m',nobby:'m'} }, sel = 0;
 var $ = function(id){ return document.getElementById(id); };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function ls(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){} }
@@ -166,15 +169,17 @@ function renderStart(){
   $('heroes').innerHTML = ORDER.map(function(h){
     return '<div class="hcard '+(cfg.pc===h?'sel':'')+'" data-h="'+h+'" style="--c:'+H[h].color+'"><img src="'+PORT[h]+'" alt=""><div class="b"><div class="r">'+H[h].role+'</div><h4>'+H[h].names[cfg.genders[h]]+'</h4>'+segHTML(h,cfg.genders[h])+'</div></div>';
   }).join('');
-  $('others').innerHTML = ORDER.filter(function(h){return h!==cfg.pc;}).map(function(h){ return '<div>'+H[h].role+' · '+H[h].names[cfg.genders[h]]+' '+segHTML(h,cfg.genders[h])+'</div>'; }).join('');
+  $('others').innerHTML = ORDER.filter(function(h){return h!==cfg.pc;}).map(function(h){ return '<div>'+H[h].role+' · '+H[h].names[cfg.genders[h]]+' '+segHTML(h,cfg.genders[h])+' <label class="pl2"><input type="checkbox" data-pl="'+h+'"'+(cfg.players.indexOf(h)>=0?' checked':'')+'> играет ещё один человек (арест)</label></div>'; }).join('');
 }
 document.addEventListener('click', function(e){
+  var pl = e.target.closest('input[data-pl]');
+  if(pl){ var ph = pl.getAttribute('data-pl'), ix = cfg.players.indexOf(ph); if(pl.checked && ix<0) cfg.players.push(ph); if(!pl.checked && ix>=0) cfg.players.splice(ix,1); return; }
   var sb = e.target.closest('.seg button');
   if(sb){ e.stopPropagation(); var h = sb.parentNode.getAttribute('data-h'); cfg.genders[h] = sb.getAttribute('data-g'); renderStart(); return; }
   var hc = e.target.closest('.hcard'); if(hc){ cfg.pc = hc.getAttribute('data-h'); renderStart(); }
 });
 $('btnGo').onclick = function(){
-  var c = { pc:cfg.pc, genders:JSON.parse(JSON.stringify(cfg.genders)), names:{} };
+  var c = { pc:cfg.pc, genders:JSON.parse(JSON.stringify(cfg.genders)), names:{}, players:[cfg.pc].concat(cfg.players.filter(function(h){return h!==cfg.pc;})) };
   var nm = $('pcname').value.trim(); if(nm) c.names[cfg.pc] = nm;
   var sd = $('seed').value.trim(); if(sd) c.seed = parseInt(sd,10) >>> 0;
   game = new CS.Game(c); sel = 0; $('start').style.display='none'; render(true); $('inp').focus();
@@ -188,10 +193,12 @@ function traceLine(rec){
   return parts.join(' → ') || 'не разобрано';
 }
 function renderLog(scroll){
-  var h = '<p class="narr intro">'+esc(game.intro)+'</p>';
+  var h = '<p class="narr intro">'+esc(game.intro)+'</p><div class="draftmark">черновик: вступление — season1.md, слова Диалогов не утверждены</div>';
   game.turns.forEach(function(r){
     h += '<p class="pl">› '+esc(r.input)+'</p><div class="trace">'+esc(traceLine(r))+'</div>';
-    r.text.forEach(function(t){ h += '<p class="narr">'+esc(t)+'</p>'; });
+    r.text.forEach(function(t){ h += '<p class="narr'+(t.indexOf('[ТЕКСТ]')===0?' stub':'')+'">'+esc(t)+'</p>'; });
+    if(r.phaseFrom==='arrest' || r.phaseTo==='arrest') h += '<div class="draftmark">черновик: сцена «Арест» — слова Диалогов (1.10), Алексей не утверждал</div>';
+    (r.notes||[]).forEach(function(n){ h += '<p class="narr stub">['+esc(n)+']</p>'; });
   });
   if(game.S.ended) h += '<div class="end"><b>Серия закончилась.</b> Можно откатиться на любой ход в панели движка, сыграть сцену заново или взять другого героя.</div>';
   $('log').innerHTML = h;

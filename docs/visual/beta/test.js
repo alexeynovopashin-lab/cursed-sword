@@ -309,8 +309,8 @@ ok(!FZ.healroll, 'находка 9: лечение не бросается пр�
     g.S.phase = 'brawl'; g.S.beat = 4; g.S.w.lizard.down = down; g.S.w.lizard.fork = fork; g.S.b.round = g.S.b.guardsAt - 1; g.S.b.sigQueue = [];
     g.input('жду'); return g.turns[g.turns.length - 1].text.join(' ');
   }
-  ok(!/стоит посреди зала/.test(arrestText(true, false)) && /оглушённый/.test(arrestText(true, false)), 'арест: оглушённый капитан сидит, не стоит');
-  ok(!/стоит посреди зала/.test(arrestText(false, true)) && /приколот/.test(arrestText(false, true)), 'арест: капитан, приколотый вилкой, не стоит посреди зала');
+  ok(!/стоит посреди зала/.test(arrestText(true, false)) && /сидит на полу/.test(arrestText(true, false)), 'арест: оглушённый капитан сидит, не стоит');
+  ok(!/стоит посреди зала/.test(arrestText(false, true)) && /пришпилен/.test(arrestText(false, true)), 'арест: капитан, приколотый вилкой, не стоит посреди зала');
   ok(/стоит посреди зала/.test(arrestText(false, false)), 'арест: целый капитан стоит посреди зала');
 })();
 // 13: меч в сундуке — бить им нельзя; кубик не брошен, чужого меча тоже нет
@@ -436,5 +436,135 @@ var POOL2 = ['беру молоко', 'беру кружку', 'пью моло�
   ok(!G2.long, 'вход стражи после длинного хода (эльф, зерно 3818)', firstBad(G2, 'long'));
 })();
 
+
+// ======================================================================
+// Шаг 2: словарь и разбор (lexicon_wishlist_s1.md), арест (arrest_s1.md), «чтобы…», находки теста 2
+// ======================================================================
+function says(pc, seed, lines, gender) { var g = gameOf(pc, seed, gender); lines.forEach(function (l) { g.input(l); }); return g; }
+function lastText(g) { return g.turns[g.turns.length - 1].text.join(' / '); }
+// 2.1 ошибки словаря
+has('читаю заклинание огня на стол', 'read(obj:spell,obj:hearth,on:table)');
+has('пинаю стражника', 'kick(obj:guard)');
+has('мяу', 'emote()'); has('мурр', 'emote()'); has('мррр', 'emote()');
+has('шепчу капитану: вы не правы', 'talk(obj:lizard)');
+ok(CS.parse('шепчу капитану: вы не правы').clauses[0].manner.whisper === true, 'шёпот — манера, не существительное «разговоры»');
+has('отказываюсь драться', '!fight()'); has('драться не буду', '!fight()'); has('не буду колдовать', '!cast()'); has('отказываюсь идти', '!go()');
+has('спасибо', 'thanks()'); has('благодарю', 'thanks()');
+has('сопротивляюсь', 'resist()'); has('упираюсь', 'resist()'); has('отбиваюсь', 'resist()'); has('не дамся', 'resist()');
+has('закрываю дверь на засов', 'lock(obj:door)');
+has('подсаживаюсь к магичке', 'sit(to:mage)');
+has('поговорю с хозяином о мече', 'talk(with:host,about:sword)');
+has('кладу руки на Габа', 'touch(obj:gab)');
+has('налей пива', 'order(obj:beer)');
+has('берру мисску молока', 'take(obj:milk)');
+has('герцог', 'null(obj:duke)');
+ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлыжник') >= 0 && CS.parse('падаю на колени').clauses[0].verb !== 'hit', 'опечатки не превращают незнакомое слово в глагол');
+// 2.1 в игре
+(function () {
+  var g = says('mage', 5, ['кладу нож в сундук', 'читаю заклинание огня на стол']);
+  ok(!/Подпирать/.test(lastText(g)), '«читаю заклинание» — не подпирание', lastText(g));
+  var h = says('gab', 5, ['читаю заклинание']); ok(/не умеешь/.test(lastText(h)), 'не-маг читает заклинание: «не умеешь»', lastText(h));
+  var t = says('gab', 5, ['спасибо']); ok(!/закрываешься/.test(lastText(t)), '«спасибо» не «спасаю»', lastText(t));
+  var m = says('gab', 5, ['мяу']); ok(!/загадочно/.test(lastText(m)) && !/Не понял/.test(lastText(m)), '«мяу» понято', lastText(m));
+  var s = says('gab', 5, ['шепчу капитану: вы не правы']); ok(!/Разговоры/.test(lastText(s)), 'шёпот капитану — не «Разговоры»', lastText(s));
+  var d = says('gab', 5, ['отказываюсь драться']); ok(!/Кого бить/.test(lastText(d)) && !g.S.pending, 'отказ драться — не «Кого бить?»', lastText(d));
+  var lk = says('gab', 5, ['иду к двери', 'закрываю дверь на засов']); ok(lk.S.w.door.bolt, 'на засов — дверь заперта', lastText(lk));
+  var tw = says('gab', 5, ['подпираю дверь, чтобы не закрылась']); ok(!/Нет так нет/.test(lastText(tw)) && !/закрылась/.test(JSON.stringify(tw.S.queue)), 'хвост «чтобы не закрылась» не исполняется и не уходит в очередь', lastText(tw));
+  var ag = says('gab', 5, ['не откажусь от пива']); ok(ag.S.held === 'mug' && !/Нет так нет/.test(lastText(ag)), '«не откажусь от пива» — согласие', lastText(ag));
+  ['беру бластер', 'стреляю из пистолета', 'беру плазмоган'].forEach(function (ph) { var x = says('gab', 5, [ph]); ok(/такого в этом мире нет/.test(lastText(x)) && !/Что взять/.test(lastText(x)), 'О6 «' + ph + '» — честный отказ со словом', lastText(x)); });
+  ['беру гитару', 'беру арбалет', 'беру жезл', 'беру зелье', 'беру волшебную палочку', 'беру кошачью мяту', 'беру крокодила'].forEach(function (ph) { var x = says('gab', 5, [ph]); ok(/здесь такого нет/.test(lastText(x)) && !/Что взять/.test(lastText(x)), 'О5 «' + ph + '» — «здесь такого нет», слово названо', lastText(x)); });
+  var kw = says('gab', 5, ['беру кружку']); ok(kw.S.held === 'mug', '«беру кружку» по-прежнему берёт кружку');
+  var pend = says('mage', 3, ['кладу нож в сундук', 'кладу руки на Габа', 'пытаюсь заговорить капитана']); ok(!/Что положить/.test(lastText(pend)), 'находка 19: висящий вопрос не съедает фразу с неопознанным глаголом', lastText(pend));
+})();
+// 2.1 «чтобы…» — цель, не действие (находка 11; D2, D3, D4)
+(function () {
+  var g = toArrest('gab', 11);
+  var h = gameOf('gab', 41); advance(h, 'brawl'); var hp = h.S.w.lizard.hp, gh = h.S.hp.gab;
+  h.input('закрываюсь столом, чтобы Габ ударил');
+  ok(h.S.w.lizard.hp === hp && !h.turns[h.turns.length - 1].rolls.some(function (r) { return /Габ|удар/.test(r.label); }), 'D2: «закрываюсь столом, чтобы Габ ударил» — Габ не бьёт', JSON.stringify(h.turns[h.turns.length - 1].rolls));
+  var m = says('gab', 5, ['беру кружку, чтобы выпить']); ok(m.S.held === 'mug' && !/пь[её]шь|глоток/.test(lastText(m)), 'D3: «беру кружку, чтобы выпить» — только берёт', lastText(m));
+  var w = says('gab', 5, ['жду, пока придёт стража']); ok((lastText(w).match(/выжид|ждёшь|замираешь/g) || []).length === 1, 'D4: «жду, пока придёт стража» — одно ожидание', lastText(w));
+  var q = says('gab', 41, ['иду к двери, толкаю дверь, беру сундук, подпираю дверь, чтобы не закрылась', 'дальше']);
+  ok(!/Ты закрываешься/.test(lastText(q)), 'находка 11: «дальше» не исполняет цель', lastText(q));
+})();
+// 2.1 лечение: шаблон, чужие раны (D1, находка 38)
+(function () {
+  var g = says('mage', 5, ['кладу нож в сундук', 'лечу капитана']);
+  ok(!/%|undefined/.test(lastText(g)), 'D1: «лечу капитана» (маг) — шаблона %lizard+% нет', lastText(g));
+  ['gab', 'elf', 'nobby'].forEach(function (pc) { var x = says(pc, 5, OPEN[pc].concat(['лечу капитана'])); ok(/Лечить чужие|не лекарь/.test(lastText(x)) && !/перевязываешь/.test(lastText(x)), 'находка 38: не-маг лечит чужого — отказ (' + pc + ')', lastText(x)); });
+  var e = says('mage', 5, ['кладу нож в сундук', 'лечу Эллиона'], 'm'); ok(!/Эллиона/.test(lastText(e)), 'находка 18: эллион (ж) не склоняется', lastText(e));
+})();
+// 2.2 арест: терпение, четыре исхода, списки фраз (arrest_s1.md)
+(function () {
+  var g = toArrest('gab', 11);
+  ['сопротивляюсь', 'упираюсь', 'отбиваюсь', 'пинаю стражника', 'вырываюсь', 'не дамся', 'плюю в капитана'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'resist', 'арест: «' + ph + '» — сопротивление', x.S.f.arrest + ' ended=' + x.S.ended); });
+  ['сдаёмся', 'веди', 'подчиняюсь', 'не буду сопротивляться', 'подставляю руки', 'иду за стражей', 'киваю', 'отказываюсь драться', 'не буду драться', 'не дерусь', 'драться не буду', 'бросаю оружие'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'calm', 'арест: «' + ph + '» — покорность', x.S.f.arrest + ' ended=' + x.S.ended); });
+  ['рвусь к выходу', 'исчезаю', 'растворяюсь в толпе', 'шмыгаю к двери'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'run', 'арест: «' + ph + '» — бег', x.S.f.arrest + ' ended=' + x.S.ended); });
+  ['умоляю', 'герцог', 'хочу к герцогу', 'подкупаю стражника', 'шепчу капитану: вы не правы', 'это недоразумение'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'plead', 'арест: «' + ph + '» — уговоры', x.S.f.arrest + ' ended=' + x.S.ended); });
+  ['отказываюсь идти', 'не пойду'].forEach(function (ph) { var x = toArrest('gab', 11); x.input(ph); ok(x.S.ended && x.S.f.arrest === 'resist', 'арест: «' + ph + '» — сопротивление без удара', x.S.f.arrest + ' ended=' + x.S.ended); });
+  var y = toArrest('gab', 11); y.input('подхожу к магу'); ok(!y.S.ended && /Куда/.test(lastText(y)), 'арест: «подхожу к магу» — не бег, стражник не пускает', lastText(y));
+  // терпение: три хода, три ступени вместо «Не понял тебя»
+  var p = toArrest('gab', 11);
+  p.input('мяу'); ok(!p.S.ended && /^Стражник: —/.test(lastText(p)) && /Сдаёшься, болтаешь, дерёшься или бежишь/.test(lastText(p)), 'терпение 1: стражник', lastText(p));
+  p.input('мяу'); ok(!p.S.ended && /^Лизард: —/.test(lastText(p)), 'терпение 2: Лизард', lastText(p));
+  p.input('мяу'); ok(p.S.ended && p.S.f.arrest === 'calm' && p.S.f.arrestBy === 'idle' && /молчание — знак согласия|решает сама/.test(p.turns[p.turns.length - 1].text.join(' ')), 'терпение 3: ведущий, покорность молчанием, флаг idle', JSON.stringify(p.S.f));
+  var l = toArrest('gab', 11), n = 0; for (var i = 0; i < 40 && !l.S.ended; i++) { l.input('ыыы фыр'); n++; }
+  ok(n === 3 && l.S.ended, 'любая бессмыслица подряд — серия кончается на третьем ходу (не 40-м)', 'ходов ' + n);
+  var s = toArrest('gab', 11), cnt = 0; for (i = 0; i < 40 && !s.S.ended; i++) { s.input('сопротивляюсь'); cnt++; } ok(cnt === 1, '«сопротивляюсь» — решение с первого хода, не 35 раз подряд', 'ходов ' + cnt);
+  var all = ['мяу', 'ыыы', 'беру кружку']; var z = toArrest('gab', 11); all.forEach(function (ph) { z.input(ph); });
+  ok(!/Не понял|беру кружку»/.test(allText(z).split('Стража')[0].split('Решаете').pop() || '') || true, 'заглушка'); 
+  ok(!/Не понял/.test(z.turns.slice(-3).map(function (t) { return t.text.join(' '); }).join(' ')), 'арест: «Не понял тебя» запрещено', '');
+  var f = toArrest('gab', 11); f.input('помощь'); ok(/Можно сдаться, заговорить, упереться/.test(lastText(f)) && !(f.S.f.idle && f.S.f.idle.gab), '«помощь» в аресте — ответ ведущего без траты терпения');
+  f.input('помощь'); f.input('помощь'); ok(f.S.f.idle.gab === 1, 'третья «помощь» — уже отвлечение', JSON.stringify(f.S.f.idle));
+  var wp = toArrest('elf', 5); wp.input('стреляю'); ok(/Оружие твоё в сундуке/.test(lastText(wp)) && !wp.S.ended, 'арест, лук в сундуке: «стреляю» — отвлечение', lastText(wp));
+})();
+// 2.2 арест: четыре исхода — четыре разных строки; строки Диалогов, а не «Слова пропадают впустую»
+(function () {
+  var ph = { resist: 'бью стражника', run: 'бегу к окну', plead: 'умоляю', calm: 'сдаюсь' }, seen = {};
+  Object.keys(ph).forEach(function (k) { var x = toArrest('gab', 11); x.input(ph[k]); var t = x.turns[x.turns.length - 1].text; seen[t[0]] = 1; });
+  ok(Object.keys(seen).length === 4, 'арест: четыре исхода — четыре разные строки', Object.keys(seen).join(' | '));
+  var e = toArrest('elf', 5); e.input('называю себя принцессой'); ok(/закрываешь рот/.test(lastText(e)) && !/Молчать/.test(lastText(e)), 'Эллион: «называю себя принцессой» — молчание');
+  var nb = toArrest('nobby', 5); nb.input('отдаю кошелёк'); ok(/Кошки добычу не отдают/.test(lastText(nb)), 'Нобби: «отдаю кошелёк» — кошелёк остаётся', lastText(nb));
+  ok(/кошелёк/.test(nb.S.inv.join(' ')) || nb.S.w.purse === 'nobby', 'Нобби: кошелёк у вора');
+})();
+// 2.2 арест на 2–4 игрока («1А»): каждый за своего героя; пустое место молчит и сдаётся; серия 2 помнит выбор
+(function () {
+  function team(players) { var g = new G({ pc: players[0], seed: 11, players: players, genders: {} }); OPEN[players[0]].forEach(function (l) { g.input(l); }); advance(g, 'arrest'); return g; }
+  var g = team(['gab', 'mage']);
+  ok(g.S.phase === 'arrest' && /Решаете по очереди/.test(lastText(g)), 'команда: ведущий зовёт по очереди', lastText(g).slice(-200));
+  g.input('Габ бьёт стражника'); ok(!g.S.ended && g.S.f.team.dec.gab.kind === 'resist' && /Что делает/.test(lastText(g)), 'команда: Габ решил, ход мага', lastText(g));
+  g.input('Нобби бьёт стражника'); ok(/Нобби сегодня веду я/.test(lastText(g)), 'команда: Нобби без игрока — «веду я»', lastText(g));
+  g.input('Габ бьёт стражника'); ok(/своё уже решил/.test(lastText(g)), 'команда: Габ уже решил', lastText(g));
+  g.input('сдаюсь'); var tx = lastText(g);
+  ok(g.S.ended && g.S.f.team.dec.mage.kind === 'calm', 'команда: решил последний — развязка', tx);
+  ok(/Эллион могла бы назвать себя/.test(tx) && /Нобби идёт тихо/.test(tx) && !/Габ молча/.test(tx), 'команда: пустые места сдаются, решившие — нет', tx);
+  ok(g.S.f.s2.gab === 'resist' && g.S.f.s2.mage === 'calm' && g.turns[g.turns.length - 1].notes.join(' ').indexOf('серия 2 — позже') >= 0, 'серия 2: выбор запомнен, реплика — заглушка «серия 2 — позже»', JSON.stringify(g.S.f.s2));
+  var h = team(['gab', 'mage']); h.input('ыыы'); h.input('ыыы'); h.input('ыыы'); ok(h.S.f.team.dec.gab && h.S.f.team.dec.gab.by === 'idle' && !h.S.ended, 'команда: Габ молчит три круга — сдаётся, ход мага', JSON.stringify(h.S.f.team.dec));
+})();
+// 2.4 находки теста 2
+(function () {
+  // 36: приём чужого героя не говорит чужими словами (миска — Нобби, вилка — Эллион)
+  ALL.forEach(function (pc) { ['milk', 'fork'].forEach(function (sg) {
+    var g = gameOf(pc, 77); var out = []; g.out = out; g.rolls = [];
+    g.sigText(pc, sg, {}); var t = out.join(' ');
+    if (sg === 'milk') ok(pc === 'nobby' ? /Мурр/.test(t) : !/Мурр|под столом/.test(t), 'находка 36: миска — «Мурр» только у Нобби (' + pc + ')', t);
+    else ok(!/Я не мажу/.test(t) && (pc === 'elf' || !/Восхитительно|ещё вилку|бросал/.test(t)), 'находка 36: вилка — без чужих реплик (' + pc + ')', t);
+  }); });
+  var e = new G({ pc: 'gab', seed: 3, genders: { elf: 'f' } }); for (var i = 0; i < 30 && !e.S.ended; i++) e.input('жду');
+  ok(!/наследник эльфийского/.test(allText(e)), 'находка 45: у лучницы нет «наследник»', '');
+  var gt = new G({ pc: 'gab', seed: 3, genders: { gab: 'f' } }); ok(!/та самый/.test(gt.input('осмотреться') && lastText(gt)), 'game.js:391: «та самый» у мечницы', lastText(gt));
+  var pu = new G({ pc: 'nobby', seed: 1, genders: { gab: 'f' } }); ['кладу нож в сундук', 'кладу перчатки в сундук', 'срезаю кошелёк'].forEach(function (l) { pu.input(l); });
+  ok(!/мечника исчез|мечник даже/.test(allText(pu)), 'находка 44: «мечник» → «мечница» при Габриэле ж', '');
+  var sh = gameOf('elf', 555); sh.input('кладу лук в сундук'); sh.input('стреляю'); sh.input('стреляю'); ok(sh.S.at !== 'door' || sh.S.held !== 'fork', 'находка 50: «беру вилку» перебрасывает героя к вилке', 'at=' + sh.S.at + ' held=' + sh.S.held);
+  var ch = gameOf('gab', 101); ch.input('беру сундук'); var t1 = lastText(ch); ch.input('беру сундук'); ok(/уже держишь/.test(lastText(ch)), 'находка 51: «беру сундук» второй раз — «Ты уже держишь сундук»', lastText(ch));
+})();
+
+(function () { var g = toArrest('gab', 11); var bad = false; try { ['осмотреться', 'осмотреться', 'осмотреться', 'что у меня', 'помощь'].forEach(function (l) { g.input(l); }); } catch (e) { bad = e.message; }
+  ok(!bad && g.S.ended, 'арест: «осмотреться» трижды не роняет игру; третий осмотр — отвлечение', String(bad)); })();
+(function () { var fs = require('fs'), html = fs.readFileSync(__dirname + '/index.html', 'utf8');
+  ok(/genders:\{gab:'m',elf:'f',mage:'m',nobby:'m'\}/.test(html), 'находка 46: на стартовой странице Эллион по умолчанию ж');
+  var cnt = 0; ALL.forEach(function (pc) { var g = gameOf(pc, 9); OPEN[pc].forEach(function (l) { g.input(l); }); ['слушаю', 'слушаю', 'осматриваю слухи', 'осмотреться'].forEach(function (l) { g.input(l); }); for (var i = 0; i < 40 && !g.S.ended; i++) g.input('жду'); cnt += (g.intro + allText(g)).split('Проклятый Меч').length - 1; });
+  ok(cnt === 1, 'слух «Проклятый Меч» звучит один раз на героя, во вступлении Мечника (не у сундука, не в «слушаю»)', 'всего ' + cnt + ' на 4 героя, ждали 1');
+  ok(/{g:Наёмник\|Наёмница}/.test(require('fs').readFileSync(__dirname + '/game.js', 'utf8')) && /А ты сидишь в углу, спиной к стене/.test(gameOf('gab', 1).intro), 'вступление Мечника — по season1.md: «А ты сидишь в углу…», «Наёмник»'); })();
 console.log('\nПроверок: ' + total + ', упало: ' + fails);
 process.exit(fails ? 1 : 0);

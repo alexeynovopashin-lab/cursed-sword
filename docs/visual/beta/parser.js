@@ -35,7 +35,44 @@
   // глаголы, у которых стем короче 4 букв, — только целиком
   var SHORT_OK = { 'бей': 1, 'бью': 1 };
 
+  function lev(a, b) {
+    var m = a.length, n = b.length, d = [], i, j;
+    for (i = 0; i <= m; i++) { d[i] = [i]; }
+    for (j = 1; j <= n; j++) d[0][j] = j;
+    for (i = 1; i <= m; i++) for (j = 1; j <= n; j++)
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[m][n];
+  }
   function verbMatch(tok) {
+    var r = verbMatch0(tok);
+    if (r) return r;
+    // «поговорю», «посмотрю»: приставка «по-» = намерение, глагол тот же
+    if (tok.length >= 6 && tok.indexOf('по') === 0) { r = verbMatch0(tok.slice(2)); if (r && r.len >= 4) return { id: r.id, len: r.len }; }
+    return null;
+  }
+  // опечатка в глаголе (П7): длина ≥6 — одна ошибка, ≥8 — две; только глагол сцены
+  function verbTypo(tok) {
+    if (tok.length < 5) return null;
+    var best = null, maxd = tok.length >= 8 ? 2 : 1, k;
+    for (k in verbExact) { if (k.length >= 4 && Math.abs(k.length - tok.length) <= 1 && lev(tok, k) <= (tok.length >= 6 ? maxd : 1)) { var d0 = lev(tok, k); if (!best || d0 < best.d) best = { id: verbExact[k], len: 5, d: d0 }; } }
+    if (tok.length >= 6) for (var i = 0; i < verbStems.length; i++) {
+      var s0 = verbStems[i][0]; if (s0.length < 5) continue;
+      var d = lev(tok.slice(0, s0.length), s0);
+      if (d <= maxd && d < s0.length / 3 && (!best || d < best.d || (d === best.d && s0.length > best.len))) best = { id: verbStems[i][1], len: s0.length, d: d };
+    }
+    return best;
+  }
+  function nounTypo(tok) {
+    if (tok.length < 5) return null;
+    var best = null, maxd = 1;
+    for (var i = 0; i < nounStems.length; i++) {
+      var s0 = nounStems[i][0]; if (s0.length < 5) continue;
+      var d = lev(tok.slice(0, s0.length), s0);
+      if (d >= 1 && d <= maxd && (!best || d < best.d || (d === best.d && s0.length > best.len))) best = { id: nounStems[i][1], len: s0.length, d: d };
+    }
+    return best;
+  }
+  function verbMatch0(tok) {
     if (verbExact[tok]) return { id: verbExact[tok], len: 99 };
     var best = null;
     for (var i = 0; i < verbStems.length; i++) {
@@ -102,7 +139,17 @@
     for (i = 0; i < toks.length; i++) {
       var t = toks[i];
       if (/^§\d+$/.test(t)) { c.speech = speeches[+t.slice(1)]; continue; }
-      if (t === 'не' || t === 'нельзя' || t === 'ни') { negNext = true; continue; }
+      if (t === 'не' || t === 'нельзя' || t === 'ни') {
+        // «драться не буду», «колдовать не хочу»: отрицание стоит после глагола и снимает его
+        if (t === 'не' && c.verb && /^(буду|стану|хочу|хотел|хотела|собираюсь|намерен|намерена|могу|стал|стала)$/.test(toks[i + 1] || '') && !/(ть|ти|чь)$/.test(toks[i + 2] || '')) { c.neg = true; i++; continue; }
+        negNext = true; continue;
+      }
+      // оператор отказа (Р1): не глагол, ставит отрицание на следующий глагол; «не откажусь» — согласие (Р4)
+      if (/^(отказ|откаж|отреч)/.test(t) && !nounMatch(t)) {
+        if (negNext) { negNext = false; c.agree = true; } else { negNext = true; c.refusal = true; }
+        continue;
+      }
+      if (/^шеп[чн]/.test(t)) c.manner.whisper = true;
       if (manner[t]) { c.manner[manner[t]] = true; continue; }
       if (t === 'собой' || t === 'собою') { c.self = true; }
       if (modal[t] && !nounMatch(t) && !verbMatch(t)) continue;
@@ -112,6 +159,11 @@
         c.args.push({ id: '@it', role: prep || 'obj', word: t, pron: true }); prep = null; continue;
       }
       var vm = verbMatch(t), nm = nounMatch(t), rm = reflMatch(t);
+      if (!vm && !nm && !rm) {
+        var tv = verbTypo(t), tn = nounTypo(t);
+        if (tv && (!tn || tv.d <= tn.d)) { vm = { id: tv.id, len: tv.len }; c.typos = (c.typos || []).concat(t + '→' + tv.id); }
+        else if (tn) { nm = { id: tn.id, len: tn.len }; c.typos = (c.typos || []).concat(t + '→' + tn.id); }
+      }
       // рефлексивный глагол всегда побеждает, если корень совпал
       if (rm && (!vm || rm.len >= vm.len - 1)) vm = rm;
       if (vm && (!nm || vm.len > nm.len)) {
@@ -141,11 +193,12 @@
       c.unknown.push(t);
     }
     if (negNext && !c.verb) c.neg = true;
+    if (c.agree && !c.verb) { c.verb = 'take'; c.neg = false; }
     return c;
   }
 
   function parse(text) {
-    var out = { raw: text, meta: null, clauses: [], corrections: [], unknown: [] };
+    var out = { raw: text, meta: null, clauses: [], corrections: [], unknown: [], goals: [] };
     var s = norm(text);
     if (!s) return out;
     var i;
@@ -159,6 +212,12 @@
       if (/^§\d+$/.test(q.trim())) return v + mid + ' ' + q;
       speeches.push(q.trim()); return v + mid + ' §' + (speeches.length - 1) + ' ';
     });
+    // обороты, где слова значат не то, что по отдельности
+    s = s.replace(/не\s+(даюсь|дамся|дадимся|даемся)/g, 'сопротивляюсь');
+    s = s.replace(/закр\S*(\s+\S+)?\s+на\s+(засов|замок|щеколд\S*|задвижк\S*|ключ)/g, 'запираю$1');
+    s = s.replace(/(клад\S+|полож\S+|ложу)\s+(свои\s+)?рук\S*\s+(на|к)\s+/g, 'касаюсь ');
+    s = s.replace(/(подставля\S*|протяг\S*|протян\S*|вытяг\S*)\s+(свои\s+)?рук\S*/g, 'сдаюсь');
+    s = s.replace(/(для того|затем|ради того),?\s+чтобы/g, 'чтобы');
     // «не X, а Y» -> Y
     s = s.replace(/(^|[\s,])не\s+[^,.;!?]+?\s*,?\s+а\s+/g, '$1');
     // разбиваем на куски
@@ -167,8 +226,13 @@
     var pending = [];
     pieces.forEach(function (p) {
       p = ' ' + p + ' ';
-      var parts = p.replace(CONNECT, function (m) { return '\u0001'; }).split('\u0001');
-      parts.forEach(function (x) { x = x.trim(); if (x) pending.push(x); });
+      // «чтобы…», «пока…» — цель или условие, не действие (Ч1, Ч3)
+      var parts = p.replace(CONNECT, function (m) { return /чтоб|пока/.test(m) ? '\u0001\u0002' : '\u0001'; }).split('\u0001');
+      parts.forEach(function (x) {
+        var goal = x.charAt(0) === '\u0002'; x = x.replace(/\u0002/g, '').trim(); if (!x) return;
+        if (goal) { out.goals.push(x); if (pending.length) pending[pending.length - 1] = pending[pending.length - 1] + '\u0003'; return; }
+        pending.push(x);
+      });
     });
     // самоисправления и утилиты
     var lastDeleted = null;
@@ -181,7 +245,8 @@
         if (!sc.rest) return;
         r = sc.rest;
       } else if (sc.mark) { r = sc.rest; if (!r) return; }
-      var c = parseClause(r, speeches);
+      var hadGoal = /\u0003$/.test(r); r = r.replace(/\u0003/g, '');
+      var c = parseClause(r, speeches); if (hadGoal) c.hasGoal = true;
       if (sc.mark && lastDeleted) { c.replaces = lastDeleted; }
       clauses.push(c);
       // хвост со вторым глаголом

@@ -48,7 +48,15 @@ form.inp input:focus{outline:none;border-color:var(--gold)}
 .room{fill:#15110d;stroke:var(--line)}
 .rname{fill:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
 .ritem{fill:#8f8168;font-size:9px}
-.fig .nm{font-size:8px;fill:var(--ink);text-anchor:middle}
+.figure .nm{font-size:8px;fill:var(--ink)}
+#map .cell{fill:#15110d;stroke:#241d16;stroke-width:.6}
+#map .wall{fill:#2a2118;stroke:#3a3026;stroke-width:.6}
+#map .obj{stroke:#0008;stroke-width:1}
+#map .olab{font-size:8.5px;fill:#e9dfcc;text-anchor:middle;pointer-events:none}
+#map .ax{font-size:8px;fill:#7a6c55;text-anchor:middle}
+#map .path{fill:none;stroke-width:1.6;stroke-dasharray:2 3;stroke-linecap:round;opacity:.9}
+.leg{display:inline-block;margin:0 8px 2px 0;white-space:nowrap}
+.leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 #dice{display:flex;align-items:center;gap:12px}
 .d20{width:64px;height:64px;position:relative;flex:none}
 .d20 svg{width:100%;height:100%}
@@ -129,7 +137,7 @@ table.rt th{color:var(--muted);font-weight:400}
     <form class="inp" id="form" autocomplete="off"><input id="inp" placeholder="Что ты делаешь? Например: толкаю дверь, беру сундук и подпираю" autofocus><button class="primary">Сказать</button></form>
    </div>
    <aside class="side">
-    <div class="box"><h3>Таверна</h3><svg id="map" viewBox="0 0 280 230"></svg></div>
+    <div class="box"><h3>Таверна</h3><svg id="map" viewBox="0 0 340 276" role="img" aria-label="План таверны: сетка 10 на 8, фигурки героев"></svg><div class="dtxt" id="maplegend" style="margin-top:6px"></div></div>
     <div class="box"><h3>Кубик</h3><div id="dice"></div></div>
     <div class="box inv"><h3>Инвентарь и герой</h3><div id="inv"></div></div>
     <div class="box"><h3>Отряд</h3><div id="party"></div></div>
@@ -153,6 +161,8 @@ table.rt th{color:var(--muted);font-weight:400}
 <script src="lexicon.js"></script>
 <script src="parser.js"></script>
 <script src="refusals.js"></script>
+<script src="grid.js"></script>
+<script src="figures.js"></script>
 <script src="game.js"></script>
 <script>
 (function(){
@@ -205,22 +215,48 @@ function renderLog(scroll){
   $('log').innerHTML = h;
   if(scroll){ var l=$('log'); l.scrollTop = l.scrollHeight; }
 }
-function figSVG(f,x,y,pc){
-  var col = f.color;
-  return '<g class="fig" transform="translate('+x+','+y+')"><path d="M0,-14 a5,5 0 1,1 0.01,0 z M-7,4 L0,-8 L7,4 z" fill="'+col+'" stroke="'+(pc?'#fff':'#0008')+'" stroke-width="'+(pc?1.4:.6)+'"/><circle cx="0" cy="-16" r="5" fill="'+col+'" stroke="'+(pc?'#fff':'#0008')+'" stroke-width="'+(pc?1.4:.6)+'"/><text class="nm" y="12">'+esc(f.name.length>9?f.name.slice(0,8)+'…':f.name)+'</text></g>';
+var CELL = 32, MG = 14, G = CS.Grid, FG = CS.Figs;
+function cx(ix){ return MG + (ix % G.W)*CELL + CELL/2; }
+function cyTop(ix){ return MG + Math.floor(ix / G.W)*CELL; }
+var OBJ_FILL = { table:'#6b4a2a', table2:'#6b4a2a', table3:'#6b4a2a', table4:'#6b4a2a', table5:'#6b4a2a', bar:'#8a5e34', barrel:'#5a3c20', milk:'#e9dfcc', chest:'#3a2a14', hearth:'#b5532a', window:'#3a5a7a' };
+function objLabel(o, w){
+  if(o.id==='chest') return w.chest.at==='held' ? 'сундук (унесён)' : 'сундук';
+  if(o.id==='milk') return w.milk==='gone' ? 'миска (пуста)' : 'миска молока';
+  if(o.id==='table' && w.tableUp) return 'стол (поднят)';
+  return o.label;
+}
+function olabSVG(txt, x, y, wd, dark){ // подпись: узкий предмет — по слову в строке
+  var lines = wd <= 44 ? txt.split(' ') : [txt], st = dark ? ' style="fill:#241d16;font-size:7.5px"' : '';
+  return '<text class="olab" x="'+x+'"'+st+'>'+lines.map(function(l,i){ return '<tspan x="'+x+'" y="'+(y+3+(i-(lines.length-1)/2)*9)+'">'+esc(l)+'</tspan>'; }).join('')+'</text>';
 }
 function renderMap(){
-  var v = game.viewState(), S = game.S, w = S.w;
-  var rooms = { bar:{x:6,y:6,w:130,h:96,n:'стойка'}, corner:{x:144,y:6,w:130,h:96,n:'угол'}, hall:{x:6,y:110,w:160,h:112,n:'зал'}, door:{x:174,y:110,w:100,h:112,n:'у двери'} };
-  var items = { bar:['миска молока: '+(w.milk==='gone'?'нет':'есть'),'кружек: '+w.mugs], corner:['большой стол'+(w.tableUp?' (поднят)':'')], hall:['табуретов: '+w.stools,'вилок: '+w.forks,'очаг, окно'], door:['дверь: '+(w.door.prop?'подпёрта':w.door.bolt?'на засове':w.door.open?'открыта':'закрыта'), 'сундук: '+(w.chest.at==='held'?'в руках':'у двери')] };
-  var s = '';
-  Object.keys(rooms).forEach(function(k){
-    var r = rooms[k]; s += '<rect class="room" x="'+r.x+'" y="'+r.y+'" width="'+r.w+'" height="'+r.h+'" rx="6"'+(v.at===k?' style="stroke:#c9a45c"':'')+'/><text class="rname" x="'+(r.x+6)+'" y="'+(r.y+12)+'">'+r.n+'</text>';
-    items[k].forEach(function(t,i){ s += '<text class="ritem" x="'+(r.x+6)+'" y="'+(r.y+r.h-6-(items[k].length-1-i)*10)+'">'+esc(t)+'</text>'; });
-    var here = v.figs.filter(function(f){return f.place===k;});
-    here.forEach(function(f,i){ s += figSVG(f, r.x+22+i*(r.w>110?32:28)%(r.w-24), r.y+44+Math.floor(i*30/(r.w-24))*26, f.pc); });
+  var v = game.viewState(), S = game.S, w = S.w, s = '', i, r, c, ix;
+  for(c=0;c<G.W;c++) s += '<text class="ax" x="'+cx(c)+'" y="10">'+G.COLS[c]+'</text>';
+  for(r=0;r<G.H;r++) s += '<text class="ax" x="6" y="'+(MG+r*CELL+CELL/2+3)+'">'+(r+1)+'</text>';
+  for(ix=0; ix<G.W*G.H; ix++){
+    var t = G.TERRAIN[ix], x0 = cx(ix)-CELL/2, y0 = cyTop(ix);
+    if(t==='wall') s += '<rect class="wall" x="'+x0+'" y="'+y0+'" width="'+CELL+'" height="'+CELL+'"/>';
+    else s += '<rect class="cell" x="'+x0+'" y="'+y0+'" width="'+CELL+'" height="'+CELL+'"'+(t==='bench'?' style="fill:#2a2014"':t==='back'?' style="fill:#1b1510"':t==='door'?' style="fill:#2e2414;stroke:#c9a45c"':'')+'/>';
+  }
+  var doorTxt = w.door.prop ? 'подпёрта' : w.door.bolt ? 'на засове' : w.door.open ? 'открыта' : 'закрыта';
+  s += '<text class="olab" x="'+cx(G.DOOR)+'" y="'+(cyTop(G.DOOR)+14)+'" style="font-size:8px">дверь</text><text class="olab" x="'+cx(G.DOOR)+'" y="'+(cyTop(G.DOOR)+24)+'" style="font-size:7px;fill:#9a8b72">'+doorTxt+'</text>';
+  G.OBJECTS.forEach(function(o){
+    var xs = o.ix.map(function(k){return cx(k)-CELL/2;}), ys = o.ix.map(cyTop), x0 = Math.min.apply(null,xs), y0 = Math.min.apply(null,ys);
+    var wd = Math.max.apply(null,xs)+CELL-x0, ht = Math.max.apply(null,ys)+CELL-y0;
+    if(o.id==='milk' && w.milk==='gone') return;
+    s += '<g id="obj-'+o.id+'"><rect class="obj" x="'+(x0+2)+'" y="'+(y0+3)+'" width="'+(wd-4)+'" height="'+(ht-6)+'" rx="5" fill="'+OBJ_FILL[o.id]+'"'+(o.id==='chest'?' stroke="#c9a45c" stroke-width="1.4"':'')+'/>'+olabSVG(objLabel(o,w), x0+wd/2, y0+ht/2, wd, o.id==='milk')+'</g>';
+  });
+  s += '<text class="olab" x="'+(cx(G.idx('A2'))-CELL/2+2)+'" y="'+(cyTop(G.idx('A1'))-1)+'" style="font-size:7px;fill:#9a8b72;text-anchor:start">лавки</text>';
+  // путь за последний ход
+  var last = game.turns[game.turns.length-1];
+  if(last && last.moves) last.moves.forEach(function(m){ if(m.path.length<2) return; var col = (FG.COLOR[m.e.charAt(0)==='g'&&m.e.length===2?'guard':m.e]||'#c9a45c'); s += '<polyline class="path" stroke="'+col+'" points="'+m.path.map(function(n){var k=G.idx(n); return cx(k)+','+(cyTop(k)+CELL-8);}).join(' ')+'"/>'; });
+  // фигурки: ряды сверху вниз, чтобы нижние были поверх верхних
+  v.figs.slice().sort(function(a,b){ return a.pos - b.pos; }).forEach(function(f){
+    var fid = f.id.length===2 && f.id.charAt(0)==='g' ? 'guard' : f.id;
+    s += '<g><title>'+esc(f.name)+' — '+f.cell+'</title>'+FG.svg(fid, { x:cx(f.pos), y:cyTop(f.pos)+CELL-4, g:S.genders[fid], marks:f.marks, pc:f.pc, uid:f.id })+'</g>';
   });
   $('map').innerHTML = s;
+  $('maplegend').innerHTML = v.figs.filter(function(f){return f.id.charAt(0)!=='g'||f.id==='gab';}).map(function(f){ return '<span class="leg"><i style="background:'+(f.color||FG.COLOR[f.id])+'"></i>'+esc(f.name)+(f.pc?' (ты)':'')+' <b>'+f.cell+'</b>'+(f.marks.length?' · '+f.marks.map(function(m){return {wound:'ранен',hide:'под столом',stun:'оглушён'}[m];}).join(', '):'')+'</span>'; }).join('')+(v.figs.some(function(f){return f.id==='g1';})?'<span class="leg"><i style="background:'+FG.COLOR.guard+'"></i>стража <b>'+v.figs.filter(function(f){return f.id.length===2&&f.id!=='gab';}).map(function(f){return f.cell;}).join(', ')+'</b></span>':'');
 }
 function renderDice(){
   var last = null;
@@ -273,10 +309,14 @@ function renderEng(){
         return '<tr><td>'+esc(x.label)+(x.bonusWhy?'<div class="dtxt">'+esc(x.bonusWhy)+'</div>':'')+(x.note?'<div class="dtxt">'+esc(x.note)+'</div>':'')+'</td><td>'+x.die+'</td><td>'+(x.mod>=0?'+':'')+x.mod+' <span class="dtxt">'+x.stat+'</span></td><td>'+x.total+'</td><td>'+x.dc+'</td><td class="'+(x.ok?'good':'bad')+'">'+(x.forced?'по сюжету':x.crit?'крит.':x.fumble?'провал':x.ok?'успех':'мимо')+'</td></tr>';
       }).join('')+'</table>';
     } else h += '<div class="dtxt">без бросков</div>';
-    h += '<h3>4. Что изменилось в мире</h3>';
+    h += '<h3>4. Карта: клетки и путь <span>сетка A–J × 1–8</span></h3>';
+    var cn = r.cells || {}, nm = function(e){ return e==='host'?'хозяин':e==='rowdy'?'задира':e==='lizard'?'капитан':(e.length===2&&e!=='gab')?'стража '+e.charAt(1):game.gname(e); };
+    h += '<div class="cl mono">'+Object.keys(cn).map(function(e){ return esc(nm(e))+' <span class="v">'+cn[e]+'</span>'; }).join(' · ')+'</div>';
+    h += (r.moves&&r.moves.length) ? '<div class="diff mono">'+r.moves.map(function(m){ return '<div><span class="p">'+esc(nm(m.e))+(m.story?' (по сюжету)':'')+'</span>: '+esc(m.path.join(' → '))+(m.cost?' · цена '+m.cost:'')+'</div>'; }).join('')+'</div>' : '<div class="dtxt">фишки не двигались</div>';
+    h += '<h3>5. Что изменилось в мире</h3>';
     h += r.diff.length ? '<div class="diff mono">'+r.diff.map(function(d){return '<div><span class="p">'+esc(d.path)+'</span>: '+esc(fmtVal(d.from))+' → <b>'+esc(fmtVal(d.to))+'</b></div>';}).join('')+'</div>' : '<div class="dtxt">состояние не менялось</div>';
   }
-  h += '<h3>5. Журнал ходов <span>клик — смотреть; ↶ — вернуть состояние до хода</span></h3>';
+  h += '<h3>6. Журнал ходов <span>клик — смотреть; ↶ — вернуть состояние до хода</span></h3>';
   h += turns.map(function(t,k){ return '<div class="turn'+(k===i?' cur':'')+'" data-i="'+(k+1)+'"><span class="n">'+t.n+'</span><span class="t">'+esc(t.input)+'</span><span class="dtxt">'+t.phaseFrom+(t.phaseTo!==t.phaseFrom?' → '+t.phaseTo:'')+'</span><button class="small" data-rb="'+t.n+'" title="Откатиться до этого хода">↶</button></div>'; }).join('') || '<div class="dtxt">пока пусто</div>';
   h += '<h3>Числа под капотом <span>черновик правил</span></h3>';
   h += '<table class="rt"><tr><th></th><th>сил</th><th>лов</th><th>инт</th><th>хар</th><th>здор.</th></tr>'+ORDER.map(function(k){var m=H[k].mods;return '<tr><td style="color:'+H[k].color+'">'+esc(game.gname(k))+'</td><td>'+m.str+'</td><td>'+m.dex+'</td><td>'+m.int+'</td><td>'+m.cha+'</td><td>'+game.S.hp[k]+'/'+H[k].hp+'</td></tr>';}).join('')+'</table>';

@@ -1,6 +1,6 @@
 /* Тесты беты «Таверна». Запуск: node docs/visual/beta/test.js */
 'use strict';
-require('./lexicon.js'); require('./parser.js'); require('./refusals.js'); require('./game.js');
+require('./lexicon.js'); require('./parser.js'); require('./refusals.js'); require('./grid.js'); require('./figures.js'); require('./game.js');
 var CS = globalThis.CS, fails = 0, total = 0;
 function ok(cond, name, extra) { total++; if (!cond) { fails++; console.log('FAIL: ' + name + (extra ? '\n      ' + extra : '')); } }
 function sig(text) {
@@ -797,6 +797,186 @@ function notesOf(g) { return g.turns[g.turns.length - 1].notes.join(' | '); }
   var viol = 0, n = 0;
   fuzz(ALL, 60, function (g2) { n++; ALL.forEach(function (h) { if (g2.S.hp[h] < 1 && !(g2.S.f.ko && g2.S.f.ko.indexOf(h) >= 0)) viol++; if (g2.S.hp[h] < 0) viol++; }); });
   ok(viol === 0 && n > 1000, '3.5: ' + n + ' ходов в случайных партиях: ни у кого здоровья ниже 1 без метки ko', String(viol));
+})();
+
+// ======================================================================
+// Шаг 4: сетка локации, перемещение фишек, SVG-фигурки (Алексей, 1.10: «персонаж подошел к сундуку, фишка персонажа переместилась»)
+// ======================================================================
+var GR = CS.Grid, FG = CS.Figs, ENTS = ['gab', 'elf', 'mage', 'nobby', 'host', 'rowdy', 'lizard', 'g1', 'g2', 'g3'];
+function near(cell, objId) { return GR.OBJ[objId].ix.some(function (t) { return GR.cheb(cell, t) <= 1 && t !== cell; }); }
+function cellOf(g, e) { return g.cellOf ? g.cellOf(e) : -2; } // на старом коде клеток нет: проверки падают, а не рушат прогон
+(function () {
+  // 4.1 сетка
+  ok(GR.W === 10 && GR.H === 8 && GR.W * GR.H <= GR.ALPHA.length, '4.1: сетка 10×8, клетка кодируется одним знаком (' + GR.ALPHA.length + ' знаков в алфавите)');
+  ok(GR.ALPHA.indexOf('"') < 0 && GR.ALPHA.indexOf('\\') < 0 && GR.ALPHA.indexOf('.') < 0 && new Set(GR.ALPHA.split('')).size === GR.ALPHA.length, '4.1: знаки позиций не требуют экранирования в JSON и не повторяются; точка — «нет на сетке»');
+  var rt = true; for (var i = 0; i < GR.W * GR.H; i++) { if (GR.idx(GR.name(i)) !== i || GR.dec(GR.enc(i)) !== i) rt = false; }
+  ok(rt && GR.name(0) === 'A1' && GR.name(GR.W * GR.H - 1) === 'J8' && GR.idx('B4') === 31, '4.1: имя клетки «B4» ↔ индекс ↔ знак — без потерь на всех 80 клетках');
+  var seen = {}, dup = 0; GR.OBJECTS.forEach(function (o) { o.ix.forEach(function (c) { if (seen[c] || c < 0 || c >= 80) dup++; seen[c] = 1; }); });
+  ok(!dup, '4.1: клетка занята одним объектом: объекты не пересекаются и лежат в сетке');
+  ['door', 'chest', 'bar', 'table', 'table2', 'table3', 'hearth', 'milk', 'window', 'barrel'].forEach(function (id) { ok(id === 'door' || GR.OBJ[id], '4.1: объект «' + id + '» есть'); });
+  ok(GR.TERRAIN[GR.DOOR] === 'door' && GR.OBJECTS.every(function (o) { return o.label; }), '4.1: дверь — проём в стене, у каждого объекта есть подпись');
+  ok(GR.OBJ.chest.ix.every(function (c) { return GR.cheb(c, GR.DOOR) <= 1; }), '4.1: сундук — рядом с дверью');
+  ok(GR.OBJ.milk.ix.every(function (c) { return GR.OBJ.bar.ix.some(function (b) { return GR.cheb(b, c) <= 1; }); }), '4.1: миска молока — у стойки');
+  var free = GR.bfs(GR.idx('B7'), 'hero', null), unreach = [];
+  for (i = 0; i < 80; i++) if (GR.walkable(i, 'hero') && free.dist[i] == null) unreach.push(GR.name(i));
+  ok(!unreach.length, '4.1: до каждой клетки, где можно стоять, от двери можно дойти', unreach.join(','));
+  ok(GR.zoneOf(GR.idx('A2')) === 'corner' && GR.zoneOf(GR.idx('G3')) === 'bar' && GR.zoneOf(GR.idx('B7')) === 'door' && GR.zoneOf(GR.idx('E6')) === 'hall', '4.1: зоны (угол / стойка / дверь / зал) совпадают с местами старого движка');
+  var homeBad = []; Object.keys(GR.HOME).forEach(function (e) { Object.keys(GR.HOME[e]).forEach(function (z) { var c = GR.idx(GR.HOME[e][z]), who = e === 'host' ? 'host' : (e.length === 2 && e.charAt(0) === 'g' && e !== 'gab') ? 'guard' : 'hero'; if (GR.zoneOf(c) !== z || !GR.walkable(c, who)) homeBad.push(e + '.' + z + '=' + GR.HOME[e][z]); }); });
+  ok(!homeBad.length, '4.1: «дом» каждой фигурки лежит в своей зоне и на проходимой клетке', homeBad.join(','));
+  ok(GR.MOVE && GR.MOVE.costPerStep === 0, '4.1: цена клетки — параметр (CS.Grid.MOVE.costPerStep = 0 до решения Механик)');
+
+  // 4.2 расстановка по тексту сцены
+  ALL.forEach(function (pc) {
+    var g = gameOf(pc, 5), c = {}; ENTS.forEach(function (e) { c[e] = cellOf(g, e); });
+    ok(c.gab === GR.idx('A2') && GR.zoneOf(c.gab) === 'corner' && (c.gab % GR.W) === 0, '4.2: ' + pc + ': Габ в углу, спиной к стене (A2)', GR.name(c.gab));
+    ok(near(c.gab, 'table'), '4.2: ' + pc + ': Габ у большого стола');
+    ok(GR.cheb(c.host, GR.OBJ.chest.ix[0]) <= 2 && GR.zoneOf(c.host) === 'door', '4.2: ' + pc + ': «у порога сундук, а рядом хозяин»', GR.name(c.host));
+    ok(near(c.lizard, 'window') || GR.cheb(c.lizard, GR.OBJ.window.ix[0]) <= 1, '4.2: ' + pc + ': капитан — у окна', GR.name(c.lizard));
+    ok(c.g1 < 0 && c.g2 < 0 && c.g3 < 0, '4.2: ' + pc + ': стражи на старте нет');
+    var vals = ENTS.map(function (e) { return c[e]; }).filter(function (x) { return x >= 0; });
+    ok(new Set(vals).size === vals.length && vals.every(function (x) { return !GR.BLOCK[x]; }), '4.2: ' + pc + ': одна фигурка на клетку, не на мебели');
+    if (pc !== 'gab') ok(GR.zoneOf(c[pc]) === 'door' && g.S.at === 'door', '4.2: ' + pc + ': игрок на пороге, зона «у двери»');
+  });
+  ok(gameOf('gab', 5).stateBytes().scene <= 942, '4.2: позиции хранятся компактно: старт сцены не больше 942 Б (было 935–942)', String(gameOf('gab', 5).stateBytes().scene));
+  ok(/^[^".\\]{10}$/.test(gameOf('mage', 5).S.c.replace(/\./g, 'x')) && gameOf('gab', 5).S.c.length === 10, '4.2: позиции — строка из 10 знаков, по знаку на фигурку');
+
+  // 4.3 перемещение: фишка стоит там, где сказано в ответе
+  var bad = [];
+  ALL.forEach(function (pc) {
+    var g = gameOf(pc, 8);
+    if (pc !== 'gab') { g.input('кладу ' + ({ elf: 'лук', mage: 'нож', nobby: 'нож' })[pc] + ' в сундук'); if (g.S.phase === 'door') bad.push(pc + ': сундук не открыл'); }
+    for (var wk = 0; wk < 4 && g.S.beat === 0; wk++) g.input('жду'); // маг: сначала «подсаживается к Габу» по сюжету (видение)
+    var CASES = [['иду к стойке', 'bar', /к стойке/], ['подхожу к сундуку', 'chest', /к сундуку/], ['иду к очагу', 'hearth', /к очагу/], ['иду к окну', 'window', /к окну/], ['подхожу к двери', 'door', /к двери/]];
+    CASES.forEach(function (cs) {
+      g.input(cs[0]); var t = g.turns[g.turns.length - 1], me = cellOf(g, pc), txt = t.text.join(' ');
+      var okp = cs[1] === 'door' ? GR.cheb(me, GR.DOOR) <= 1 : near(me, cs[1]);
+      if (!okp) bad.push(pc + ' «' + cs[0] + '»: клетка ' + GR.name(me) + ' не рядом с «' + cs[1] + '»');
+      if (g.S.at !== GR.zoneOf(me)) bad.push(pc + ' «' + cs[0] + '»: зона ' + g.S.at + ' ≠ зона клетки ' + GR.zoneOf(me));
+      if (t.moves.length && /^Ты (идёшь|пробираешься|протискиваешься)/.test(txt) && !cs[2].test(txt)) bad.push(pc + ' «' + cs[0] + '»: текст «' + txt.slice(0, 40) + '» не про это место');
+    });
+  });
+  ok(!bad.length, '4.3: «иду к стойке / подхожу к сундуку / к очагу / к окну / к двери»: фишка стоит рядом с объектом, зона и текст совпадают (4 героя)', bad.slice(0, 3).join(' || '));
+  var m = gameOf('mage', 5); m.input('кладу нож в сундук'); advance(m, 'evening', 3);
+  m.input('иду к стойке'); var tw = m.turns[m.turns.length - 1];
+  ok(tw.moves.length >= 1 && tw.moves[0].e === 'mage' && tw.moves[0].path.length >= 2 && tw.moves[0].path[0] === GR.name(tw.moves[0].path.length ? GR.idx(tw.moves[0].path[0]) : 0), '4.3: у хода есть путь (список клеток) для панели движка', JSON.stringify(tw.moves.slice(0, 1)));
+  var pth = tw.moves[0].path, stepOk = pth.every(function (n, k) { return k === 0 || GR.cheb(GR.idx(n), GR.idx(pth[k - 1])) === 1; });
+  ok(stepOk && pth.every(function (n) { return GR.walkable(GR.idx(n), 'hero'); }), '4.3: путь — по соседним клеткам и не через мебель', pth.join('>'));
+  var sit = gameOf('mage', 5); sit.input('кладу нож в сундук'); sit.input('подсаживаюсь к Габу');
+  ok(GR.cheb(cellOf(sit, 'mage'), cellOf(sit, 'gab')) === 1, '4.3: «подсаживаюсь к Габу» — маг в клетке рядом с Габом', GR.name(cellOf(sit, 'mage')) + ' / Габ ' + GR.name(cellOf(sit, 'gab')));
+  var fl = gameOf('elf', 5); fl.input('кладу лук в сундук'); advance(fl, 'brawl'); fl.input('бегу к двери');
+  ok(GR.cheb(cellOf(fl, 'elf'), GR.DOOR) <= 1 && /двер/.test(lastText(fl)), '4.3: «бегу к двери» в драке — фишка у двери, и текст про дверь', GR.name(cellOf(fl, 'elf')));
+  var rf = gameOf('elf', 5); rf.input('кладу лук в сундук'); var before = cellOf(rf, 'elf'); rf.input('бегу к двери');
+  ok(cellOf(rf, 'elf') === before && /Дверь — вот она/.test(lastText(rf)), '4.3: пока «побег» отказан текстом — фишка не двигается');
+  var dr = gameOf('nobby', 5); dr.input('иду к стойке'); ok(cellOf(dr, 'nobby') === GR.idx('B7') && /перекрывает/.test(lastText(dr)), '4.3: с оружием дальше двери фишка не идёт — отказ и клетка прежняя');
+  var hd = gameOf('nobby', 5); hd.input('кладу нож в сундук'); hd.input('прячусь под стол');
+  ok(GR.OBJECTS.some(function (o) { return /^table/.test(o.id) && near(cellOf(hd, 'nobby'), o.id); }), '4.3: «прячусь под стол» — фишка у стола', GR.name(cellOf(hd, 'nobby')));
+
+  // 4.4 фишки по сюжету
+  var st = gameOf('gab', 5); st.input('жду');
+  ok(GR.zoneOf(cellOf(st, 'mage')) === 'corner' && GR.cheb(cellOf(st, 'mage'), cellOf(st, 'gab')) === 1, '4.4: маг, положив нож, подсаживается к Габу (по сюжету, игрок Габ не двигал его)', GR.name(cellOf(st, 'mage')));
+  ok(GR.zoneOf(cellOf(st, 'host')) === 'bar', '4.4: после сундука хозяин уходит за стойку', GR.name(cellOf(st, 'host')));
+  advance(st, 'brawl'); ok(GR.zoneOf(cellOf(st, 'elf')) === 'bar' && GR.zoneOf(cellOf(st, 'rowdy')) === 'bar', '4.4: эллион угощает у стойки, задира подошёл', GR.name(cellOf(st, 'elf')) + '/' + GR.name(cellOf(st, 'rowdy')));
+  ok(GR.cheb(cellOf(st, 'nobby'), cellOf(st, 'rowdy')) <= 2, '4.4: Нобби сбил задиру — рядом с ним', GR.name(cellOf(st, 'nobby')));
+  var ar = toArrest('gab', 5), guards = [function () { return ENTS.slice(7).filter(function (e) { return cellOf(ar, e) >= 0; }).length; }], n1 = guards[0]();
+  ok(n1 === 1 && cellOf(ar, 'g1') === GR.DOOR && cellOf(ar, 'rowdy') < 0, '4.4: арест: в дверях первый стражник, задиры нет', GR.name(cellOf(ar, 'g1')));
+  ar.input('жду'); var n2 = guards[0](); ar.input('жду'); var n3 = guards[0]();
+  ok(n2 >= n1 && n3 >= n2 && n3 <= 3 && n2 + n3 > 2, '4.4: стража входит по ходу ареста: ' + [n1, n2, n3].join(' → ') + ' на сетке', '');
+  var ar2 = toArrest('gab', 5); var g1b = cellOf(ar2, 'g1'); ar2.input('жду'); ok(cellOf(ar2, 'g1') !== g1b, '4.4: стражник идёт к героям, а не стоит в дверях');
+  var occOK = true; [ar, ar2].forEach(function (a) { var v = ENTS.map(function (e) { return cellOf(a, e); }).filter(function (x) { return x >= 0; }); if (new Set(v).size !== v.length) occOK = false; });
+  ok(occOK, '4.4: в аресте две фигурки в одной клетке не стоят');
+  // решение героя двигает фишку: бег — к двери, уговоры — к капитану
+  var tm = new G({ pc: 'gab', seed: 11, players: ['gab', 'elf'], genders: {} }); advance(tm, 'arrest'); tm.input('рвусь к выходу');
+  ok(GR.cheb(cellOf(tm, 'gab'), GR.DOOR) <= 2 && tm.S.pos.gab === GR.zoneOf(cellOf(tm, 'gab')), '4.4: арест: «рвусь к выходу» — фишка Габа идёт к двери', GR.name(cellOf(tm, 'gab')));
+  tm.input('умоляю'); ok(GR.cheb(cellOf(tm, 'elf'), cellOf(tm, 'lizard')) <= 1, '4.4: арест: «умоляю» — Эллион идёт к капитану', GR.name(cellOf(tm, 'elf')));
+  ok(tm.S.at === GR.zoneOf(cellOf(tm, tm.S.pc)) || tm.S.ended, '4.4: арест: смена героя игрока не телепортирует его');
+
+  // 4.5 откат и перезапуск
+  var rb = gameOf('gab', 21), snaps = [rb.S.c];
+  ['иду к стойке', 'жду', 'иду к сундуку', 'иду в зал', 'жду', 'жду'].forEach(function (l) { rb.input(l); snaps.push(rb.S.c); });
+  var okRb = true; for (i = rb.turns.length; i >= 1; i--) { var cp = rb.S.c; if (!rb.rollback(i) || rb.S.c !== snaps[i - 1]) okRb = false; }
+  ok(okRb && rb.S.c === snaps[0], '4.5: откат на любой ход возвращает фишки на прежние клетки (6 ходов, назад до начала)');
+  var rs = gameOf('gab', 21); rs.input('иду к стойке'); rs.input('жду'); rs.input('жду'); var start = gameOf('gab', 21).S.c; rs.restart(false);
+  ok(rs.S.c === start && rs.turns.length === 0 && rs.cellNames().gab === 'A2', '4.5: «сцена заново» — фишки на стартовых клетках');
+  var ra = toArrest('mage', 9); var ac = ra.S.c, nn = ra.turns.length; ra.input('рвусь к выходу'); ra.rollback(nn + 1); ok(ra.S.c === ac && ra.S.phase === 'arrest', '4.5: откат хода в аресте возвращает и стражу, и героев');
+  var rsd = gameOf('elf', 4); rsd.input('кладу лук в сундук'); rsd.restart(true); ok(rsd.S.c === gameOf('elf', rsd.cfg.seed).S.c, '4.5: «заново с новым зерном» — те же стартовые клетки');
+
+  // 4.6 команда 2–4: герой без игрока двигается по сюжету; позиции и зоны в согласии
+  [['gab', 'elf'], ['gab', 'elf', 'mage'], ['gab', 'elf', 'mage', 'nobby'], ['nobby', 'mage']].forEach(function (pl) {
+    var t = new G({ pc: pl[0], seed: 13, players: pl, genders: {} }); OPEN[pl[0]].forEach(function (l) { t.input(l); });
+    var seenElf = {}; for (var k = 0; k < 20 && t.S.phase !== 'arrest'; k++) { t.input('жду'); seenElf[cellOf(t, 'elf')] = 1; }
+    ok(Object.keys(seenElf).length >= 2 || pl[0] === 'elf', '4.6: команда ' + pl.join('+') + ': Эллион без игрока меняет клетку по сюжету');
+    for (k = 0; k < 6 && !t.S.ended; k++) t.input(k === 4 ? 'сдаюсь' : 'жду');
+    var v = ENTS.map(function (e) { return cellOf(t, e); }).filter(function (x) { return x >= 0; });
+    ok(new Set(v).size === v.length && ORDER4(t), '4.6: команда ' + pl.join('+') + ': в аресте клетки не совпадают, зоны героев согласованы с клетками');
+  });
+  function ORDER4(t) { return ['gab', 'elf', 'mage', 'nobby'].every(function (h) { var c = cellOf(t, h); return c < 0 || t.S.ended || (h === t.S.pc ? t.S.at : t.S.pos[h]) === GR.zoneOf(c); }); }
+})();
+
+// 4.7 случайные партии: инварианты карты в каждом ходе (четыре героя игрока, 60 зёрен)
+(function () {
+  var viol = {}, n = 0, mx = 0;
+  var bad = fuzz(ALL, 60, function (g, t, bad, where, was) {
+    n++; var S = g.S, w = S.w, cells = ENTS.map(function (e) { return [e, cellOf(g, e)]; }), occ = {};
+    if (S.c.length !== 10) note(bad, 'len', where);
+    cells.forEach(function (ec) {
+      var e = ec[0], c = ec[1]; if (c < 0) return;
+      var who = e === 'host' ? 'host' : (e.length === 2 && e.charAt(0) === 'g') ? 'guard' : 'hero';
+      if (!GR.walkable(c, who)) note(bad, 'walk', where + ' ' + e + '@' + GR.name(c));
+      if (occ[c]) note(bad, 'dup', where + ' ' + e + '/' + occ[c]); occ[c] = e;
+    });
+    ['gab', 'elf', 'mage', 'nobby'].forEach(function (h) {
+      var c = cellOf(g, h), ko = S.f.ko && S.f.ko.indexOf(h) >= 0;
+      if (ko && c >= 0) note(bad, 'ko', where + ' ' + h);
+      if (!ko && c < 0) note(bad, 'gone', where + ' ' + h);
+      if (!ko && c >= 0 && !S.ended) { var z = h === S.pc ? S.at : S.pos[h]; if (z !== GR.zoneOf(c)) note(bad, 'zone', where + ' ' + h + ' ' + z + '≠' + GR.zoneOf(c)); }
+    });
+    if (S.w.guards && cellOf(g, 'g1') < 0) note(bad, 'g1', where);
+    if (!S.w.guards && cellOf(g, 'g1') >= 0) note(bad, 'g1early', where);
+    if (w.rowdy.gone && cellOf(g, 'rowdy') >= 0) note(bad, 'rowdy', where);
+    var moves = t.moves || []; moves.forEach(function (mv) { if (!mv.to || (mv.path && mv.path.some(function (p) { return GR.idx(p) < 0 || GR.idx(p) >= 80; }))) note(bad, 'path', where); });
+    if (t.text.join('\n').length > 1024) note(bad, 'len1024', where);
+    mx = Math.max(mx, g.stateBytes().scene);
+  });
+  ['len', 'walk', 'dup', 'ko', 'gone', 'zone', 'g1', 'g1early', 'rowdy', 'path', 'len1024'].forEach(function (k) { ok(!bad[k], '4.7: ' + n + ' ходов в случайных партиях, нарушение «' + k + '»: нет', firstBad(bad, k)); });
+  ok(mx <= 1319, '4.7: сцена с позициями не растёт: максимум ' + mx + ' Б (до шага 4 — 1319 Б)', String(mx));
+  console.log('   (4.7) ходов: ' + n + ', максимум сцены: ' + mx + ' Б');
+})();
+
+// 4.8 фигурки: наличие, размер, пол, метки (рост — слова Алексея 1.10)
+(function () {
+  var H = { gab: 190, elf: 180, mage: 170, nobby: 150 };
+  ['gab', 'elf', 'mage', 'nobby', 'host', 'rowdy', 'lizard', 'guard'].forEach(function (id) {
+    ['m', 'f'].forEach(function (gn) {
+      var b = FG.bbox(id, gn), h = FG.HEIGHT[id], s = FG.svg(id, { g: gn, uid: id + gn, x: 10, y: 20 });
+      ok(Math.abs((b.y1 - b.y0) - h) < 0.01 && Math.abs(b.y1) < 0.01, '4.8: фигурка «' + id + '» (' + gn + '): рост по рамке = ' + h + ' см, ноги на полу', (b.y1 - b.y0) + '');
+      ok(new RegExp('<g id="fig-' + id + gn + '" class="figure" data-fig="' + id + '" data-h="' + h + '"').test(s) && /<ellipse/.test(s) && /<polygon/.test(s) && (s.match(/<(ellipse|polygon|rect|line)/g) || []).length >= 14, '4.8: фигурка «' + id + '» (' + gn + '): элемент с id, рост в атрибуте, ≥14 частей');
+      var w = b.x1 - b.x0; ok(w >= 30 && w <= 90, '4.8: фигурка «' + id + '» (' + gn + '): ширина ' + Math.round(w) + ' см — в разумных пределах');
+      var px = +(/data-px="([\d.]+)"/.exec(s) || [])[1]; ok(Math.abs(px - h * 0.232) < 0.05, '4.8: «' + id + '»: на карте ' + px + ' px при 0,232 px/см (читается на 375 px: ≥ 34 px)', String(px));
+    });
+  });
+  ok(FG.HEIGHT.gab === 190 && FG.HEIGHT.elf === 180 && FG.HEIGHT.mage === 170 && FG.HEIGHT.nobby === 150, '4.8: рост героев — 190 / 180 / 170 / 150 (слова Алексея)');
+  var hs = Object.keys(H).map(function (k) { var b = FG.bbox(k, 'f'); return (b.y1 - b.y0) / H[k]; });
+  ok(hs.every(function (r) { return Math.abs(r - 1) < 1e-6; }) && Math.abs(FG.bbox('gab', 'f').y0 - FG.bbox('gab', 'm').y0) < 1e-6, '4.8: Габриэла и Габ — одного роста (190); пропорции в одном масштабе');
+  var gm = FG.bbox('gab', 'm'), gf = FG.bbox('gab', 'f'), sm = FG.shapes('gab', 'm'), sf = FG.shapes('gab', 'f');
+  ok(JSON.stringify(sm) !== JSON.stringify(sf) && (gm.x1 - gm.x0) !== (gf.x1 - gf.x0), '4.8: пол виден в фигурке: у Габриэлы другая форма (плечи, хвост волос), а не та же')
+  ok((function () { var wd = function (b) { return b.x1 - b.x0; }; var wide = FG.shapes('gab', 'f').filter(function (s) { return s.k === 'p'; }).length > 0; return wide && wd(gf) >= 55; })(), '4.8: Габриэла крепкая: ширина по плечам и плащу ≥ 55 см, не тростинка');
+  ['elf', 'mage', 'nobby'].forEach(function (id) { ok(JSON.stringify(FG.shapes(id, 'm')) !== JSON.stringify(FG.shapes(id, 'f')), '4.8: «' + id + '»: форма по полу отличается'); });
+  ['wound', 'stun', 'hide'].forEach(function (m) { var s = FG.svg('gab', { marks: [m], uid: 'x' }); ok(new RegExp('id="mark-' + m + '-x"').test(s), '4.8: метка «' + m + '» есть у фигурки и имеет id'); });
+  ['gab', 'elf', 'mage', 'nobby'].forEach(function (h) { ok(FG.COLOR[h] === CS.Game.HEROES[h].color, '4.8: цвет фигурки «' + h + '» — как у героя в index.html'); });
+  // метки состояний на карте приходят из движка
+  var g = gameOf('gab', 5); advance(g, 'brawl'); g.S.hp.gab = 8; g.S.w.lizard.down = true; g.S.hidden = true;
+  var v = g.viewState(); var fgab = v.figs.filter(function (f) { return f.id === 'gab'; })[0], flz = v.figs.filter(function (f) { return f.id === 'lizard'; })[0];
+  ok(fgab.marks.indexOf('wound') >= 0 && fgab.marks.indexOf('hide') >= 0 && flz.marks.indexOf('stun') >= 0, '4.8: «ранен» (здоровье 8 из 14 ≤ ⅔), «под столом», «оглушён» доходят до карты');
+  g.S.hp.gab = 10; ok(g.viewState().figs.filter(function (f) { return f.id === 'gab'; })[0].marks.indexOf('wound') < 0, '4.8: при 10 из 14 метки «ранен» нет (границы states.md §1)');
+  // 16 сочетаний полов: карта рисуется у всех, фигурки на месте
+  var badF = [], games = 0;
+  ALL.forEach(function (pc) { for (var mask = 0; mask < 16; mask++) {
+    var gs = { gab: mask & 1 ? 'f' : 'm', elf: mask & 2 ? 'f' : 'm', mage: mask & 4 ? 'f' : 'm', nobby: mask & 8 ? 'f' : 'm' }, x = new G({ pc: pc, seed: 17, genders: gs }); games++;
+    ['кладу лук в сундук', 'кладу нож в сундук', 'иду к стойке', 'подсаживаюсь к Габу', 'жду', 'жду', 'жду', 'жду', 'жду'].forEach(function (l) { x.input(l); });
+    x.viewState().figs.forEach(function (f) { var id = f.id.length === 2 && f.id !== 'gab' ? 'guard' : f.id; var s = FG.svg(id, { g: x.S.genders[id], uid: f.id, marks: f.marks }); if (!new RegExp('id="fig-' + f.id + '"').test(s) || /NaN|undefined/.test(s)) badF.push(pc + '/' + mask + ' ' + f.id); });
+    if (x.turns.some(function (t) { return t.text.join('\n').length > 1024; })) badF.push(pc + '/' + mask + ' >1024');
+  } });
+  ok(!badF.length, '4.8: формы по полу: ' + games + ' партий (4 героя игрока × 16 сочетаний полов) — все фигурки рисуются, ответ ≤ 1024', badF.slice(0, 3).join('; '));
 })();
 
 console.log('\nПроверок: ' + total + ', упало: ' + fails);

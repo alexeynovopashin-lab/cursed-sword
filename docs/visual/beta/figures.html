@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Фигурки беты — галерея</title>
+<style>
+:root{--bg:#0e0c0a;--card:#1a1612;--ink:#e9dfcc;--muted:#9a8b72;--line:#3a3026;--gold:#c9a45c;--draft:#e0a54a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;padding:16px;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+h1{font:700 26px Georgia,serif;color:var(--gold);margin:0 0 4px}
+h2{font:700 13px system-ui;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:22px 0 6px}
+p{color:var(--muted);max-width:70ch;margin:4px 0}
+.tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--draft);border:1px solid var(--draft);border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:middle}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+svg{display:block;min-width:620px;width:100%;height:auto}
+svg text{fill:var(--ink)}
+svg .nm{font:10px system-ui}
+</style>
+</head>
+<body>
+<h1>Фигурки беты <span class="tag">черновик</span></h1>
+<p>Все фигурки в одном масштабе: рост виден в пропорциях (Габ и Габриэла 190, Эллион 180, Луциан 170, Нобби 150 — слова Алексея 1.10). Хозяин, задира, капитан Лизард и стража — рост подобран под сцену, каноном не задан. Внешность героев — по листам персонажей.</p>
+<h2>Герои: мужская и женская форма</h2>
+<div class="scroll"><svg id="heroes" viewBox="0 0 900 330"></svg></div>
+<h2>Остальные в сцене</h2>
+<div class="scroll"><svg id="npc" viewBox="0 0 900 330"></svg></div>
+<h2>Метки состояния</h2>
+<p>«Ранен» — красный значок (здоровье ⅔ и меньше), «оглушён» — звёзды над головой, «под столом» — доска стола перед полупрозрачной фигуркой.</p>
+<div class="scroll"><svg id="marks" viewBox="0 0 900 330"></svg></div>
+<script src="grid.js"></script>
+<script src="figures.js"></script>
+<script>
+(function () {
+  var F = CS.Figs, K = 1.4, BASE = 290;
+  function ruler(w) { return [150, 170, 180, 190].map(function (h) { var y = BASE - h * K; return '<line x1="34" x2="' + (w - 6) + '" y1="' + y + '" y2="' + y + '" stroke="#4a3d2e" stroke-dasharray="3 5"/><text x="4" y="' + (y + 4) + '" font-size="11" fill="#9a8b72" style="fill:#9a8b72">' + h + '</text>'; }).join('') + '<line x1="34" x2="' + (w - 6) + '" y1="' + BASE + '" y2="' + BASE + '" stroke="#6a5a42"/>'; }
+  function cap(id, g, x, extra) { return '<text class="nm" x="' + x + '" y="' + (BASE + 16) + '" text-anchor="middle">' + F.LABEL[id].split(' / ')[g === 'f' && F.LABEL[id].indexOf(' / ') > 0 ? 1 : 0] + '</text><text class="nm" x="' + x + '" y="' + (BASE + 29) + '" text-anchor="middle" style="fill:#9a8b72">' + F.HEIGHT[id] + ' см' + (extra || '') + '</text>'; }
+  var s = ruler(900), x = 90;
+  ['gab', 'elf', 'mage', 'nobby'].forEach(function (id) { ['m', 'f'].forEach(function (g) { s += F.svg(id, { x: x, y: BASE, k: K, g: g, uid: id + '-' + g }) + cap(id, g, x, ' · ' + (g === 'm' ? 'м' : 'ж')); x += 105; }); });
+  document.getElementById('heroes').innerHTML = s;
+  s = ruler(900); x = 100;
+  ['host', 'rowdy', 'lizard', 'guard'].forEach(function (id) { s += F.svg(id, { x: x, y: BASE, k: K, uid: id }) + cap(id, 'm', x); x += 150; });
+  document.getElementById('npc').innerHTML = s;
+  s = ruler(900); x = 120;
+  [['gab', ['wound']], ['elf', ['hide']], ['mage', ['wound', 'hide']], ['lizard', ['stun']], ['rowdy', ['stun', 'wound']]].forEach(function (a, i) {
+    s += F.svg(a[0], { x: x, y: BASE, k: K, g: a[0] === 'elf' ? 'f' : 'm', marks: a[1], uid: 'm' + i }) + cap(a[0], 'm', x, ' · ' + a[1].map(function (m) { return { wound: 'ранен', hide: 'под столом', stun: 'оглушён' }[m]; }).join(', ')); x += 160;
+  });
+  document.getElementById('marks').innerHTML = s;
+})();
+</script>
+</body>
+</html>

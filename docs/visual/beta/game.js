@@ -71,7 +71,7 @@
       t: 0, beat: 0, sub: 0,
       inv: [], armed: false, weaponIn: false,
       hp: { gab: 14, elf: 9, mage: 8, nobby: 7 }, mana: 3, hidden: false, shield: false,
-      pos: { gab: 'corner', elf: 'hall', mage: 'door', nobby: 'hall', lizard: 'hall', rowdy: 'hall', host: 'bar' },
+      pos: { gab: 'corner', elf: 'hall', mage: 'door', nobby: 'hall', rowdy: 'hall' }, c: '..........',
       w: {
         door: { open: false, prop: 0, bolt: false },
         chest: { at: 'door', lid: false, has: ['sword'] },
@@ -96,7 +96,8 @@
     }
     if (pc === 'gab') S.inv = ['purse'];
     this.S = S; this.history = []; this.turns = []; this.log = [];
-    this.trace = null;
+    this.trace = null; this.moves = [];
+    this.syncCells(null);
     this.intro = this.buildIntro();
   };
 
@@ -191,12 +192,13 @@
     if (S.hp[h] > 0 || COMPANION_MAY_DIE) return false;
     S.f.ko = S.f.ko || []; if (S.f.ko.indexOf(h) < 0) S.f.ko.push(h);
     S.pos[h] = null; this.notes.push(this.gname(h) + ': при смерти — выбывает из сцены, очнётся позже (не гибнет до акта III) — ТЕКСТ нужен');
+    this.syncCells(S, true);
     return true;
   };
   Game.prototype.wake = function (h) { // очнулся в следующей сцене: 1 здоровья («тяжело ранен»), на своём месте
     var S = this.S; if (!S.f.ko || S.f.ko.indexOf(h) < 0) return false;
     S.f.ko = S.f.ko.filter(function (x) { return x !== h; }); if (!S.f.ko.length) delete S.f.ko;
-    S.hp[h] = Math.max(1, S.hp[h]); S.pos[h] = h === S.pc ? S.at : (h === 'gab' ? 'corner' : 'hall'); return true;
+    S.hp[h] = Math.max(1, S.hp[h]); S.pos[h] = h === S.pc ? S.at : (h === 'gab' ? 'corner' : 'hall'); this.syncCells(S, true); return true;
   };
   // rolls.md §2: единица и двадцатка не пустые. Слов Диалогов для них нет — эффект в состоянии и в панели («ТЕКСТ нужен»).
   Game.prototype.fx = function (r, kind) {
@@ -230,7 +232,7 @@
   // ---- ход ---------------------------------------------------------------
   Game.prototype.input = function (text) {
     var before = clone(this.S), rec = { n: this.turns.length + 1, input: text, text: [], rolls: [], trace: null, diff: [], phaseFrom: this.S.phase };
-    this.rolls = rec.rolls; this.out = rec.text; this.cost = 0; this.mark = null; this.acted = 0; this.refused = false; this.draft = false; this.notes = []; this.idleTurn = false; delete this.S.f.arrestDone;
+    this.rolls = rec.rolls; this.out = rec.text; this.cost = 0; this.mark = null; this.acted = 0; this.refused = false; this.draft = false; this.notes = []; this.moves = []; this.idleTurn = false; delete this.S.f.arrestDone;
     var S = this.S, tooLong = false;
     if (text.length > MAX_INPUT) { text = text.slice(0, MAX_INPUT); rec.input = text; tooLong = true; }
     var p = CS.parse(text);
@@ -283,6 +285,8 @@
     var S = this.S;
     if (this.cost > 0 && !skipTick && !S.ended) this.tick();
     if (this.cost > 0 || this.acted) S.turn++;
+    this.syncCells(before);
+    rec.moves = this.moves; rec.cells = this.cellNames();
     rec.diff = diffState(before, this.S);
     rec.draft = !!this.draft; rec.phaseTo = S.phase; rec.ended = S.ended; rec.notes = this.notes || [];
     this.history.push({ before: JSON.stringify(before), rec: rec });
@@ -429,23 +433,114 @@
 
   // ---- перемещение -------------------------------------------------------
   Game.prototype.placeOf = function (id) {
-    var S = this.S;
-    if (S.pos[id]) return S.pos[id];
-    if (id === 'purse') return S.w.purse === 'gab' ? S.pos.gab : null;
-    if (id === 'book') return S.pos.mage;
+    var S = this.S, e = id === 'guard' ? 'g1' : id === 'purse' ? (S.w.purse === 'gab' ? 'gab' : null) : id === 'book' ? 'mage' : id;
+    if (e && ENT.indexOf(e) >= 0) { var c = this.cellOf(e); return c >= 0 ? G.zoneOf(c) : null; }
     return PLACE_OF[id] || null;
   };
   Game.prototype.approach = function (id) { // подойти по необходимости; вернуть false, если нельзя
     var S = this.S, pl = this.placeOf(id);
-    if (!pl || pl === S.at) return true;
-    if (S.phase === 'door') { this.say(this.T('Хозяин перекрывает вход рукой: — С оружием — нельзя. Сначала сундук.')); return false; }
+    if (!pl) return true;
+    if (pl !== S.at && S.phase === 'door') { this.say(this.T('Хозяин перекрывает вход рукой: — С оружием — нельзя. Сначала сундук.')); return false; }
     if (S.phase === 'arrest') { return true; }
-    S.at = pl; this.moved = true;
-    this.say('Ты идёшь ' + { door: 'к двери', hall: 'в зал', corner: 'в угол', bar: 'к стойке' }[pl] + '.');
+    var mv = this.walkTo(S.pc, id);
+    if (!mv || mv.same) return true;
+    if (mv.zoneFrom !== mv.zoneTo) { this.moved = true; this.say('Ты идёшь ' + this.goText(id, pl) + '.'); }
     return true;
   };
-
   // ---- обработчики -------------------------------------------------------
+  // ---- клетки (шаг 4): позиции фигур на сетке «Таверны» -------------------
+  // Истина — строка S.c: по знаку на фигуру (индекс клетки), '.' — не на сетке. S.at / S.pos[герой] — «зона» (door/corner/bar/hall) для старого
+  // движка: зона = зона клетки; если сюжет сменил зону, syncCells ставит фигуру в клетку этой зоны.
+  var G = CS.Grid, ENT = ['gab', 'elf', 'mage', 'nobby', 'host', 'rowdy', 'lizard', 'g1', 'g2', 'g3'];
+  var GO_OBJ = { door: 'door', chest: 'chest', bar: 'bar', milk: 'milk', hearth: 'hearth', window: 'window', barrel: 'barrel', table: 'table', beer: 'bar', mug: 'bar', crumbs: 'bar', fork: 'table3' };
+  var GO_TXT = { chest: 'к сундуку', door: 'к двери', bar: 'к стойке', milk: 'к миске молока', hearth: 'к очагу', window: 'к окну', barrel: 'к бочке', table: 'к большому столу в углу', tables: 'к столу', beer: 'к стойке', mug: 'к стойке', crumbs: 'к стойке', fork: 'к столу', host: 'к хозяину', rowdy: 'к задире', lizard: 'к капитану', guard: 'к страже' };
+  var GO_ZONE = { door: 'к двери', hall: 'в середину зала', corner: 'в угол, к большому столу', bar: 'к стойке' };
+  function whoOf(e) { return e === 'host' ? 'host' : /^g\d$/.test(e) ? 'guard' : 'hero'; }
+  Game.prototype.cellOf = function (e) { var k = ENT.indexOf(e); return k < 0 || !this.S.c ? -1 : G.dec(this.S.c.charAt(k)); };
+  Game.prototype.setCell = function (e, ix) { var S = this.S, k = ENT.indexOf(e); S.c = S.c.slice(0, k) + G.enc(ix) + S.c.slice(k + 1); };
+  Game.prototype.occupied = function (except) { var o = {}, self = this; ENT.forEach(function (e) { if (e === except) return; var c = self.cellOf(e); if (c >= 0) o[c] = e; }); return o; };
+  Game.prototype.cellNames = function () { var o = {}, self = this; ENT.forEach(function (e) { var c = self.cellOf(e); if (c >= 0) o[e] = G.name(c); }); return o; };
+  Game.prototype.goText = function (id, pl, long) {
+    if (ORDER.indexOf(id) >= 0 && id !== this.S.pc) return 'к ' + this.T('%' + id + '~%');
+    return GO_TXT[id] || (long ? GO_ZONE[pl] : { door: 'к двери', hall: 'в зал', corner: 'в угол', bar: 'к стойке' }[pl]);
+  };
+  Game.prototype.entPlace = function (e) { // где по сюжету должна стоять фигура; null — её на сетке нет
+    var S = this.S, w = S.w;
+    if (ORDER.indexOf(e) >= 0) { if (S.f.ko && S.f.ko.indexOf(e) >= 0) return null; return (e === S.pc ? S.at : S.pos[e]) || null; }
+    if (e === 'host') return (S.phase === 'door' || !S.f.chestDone) ? 'door' : 'bar'; // «у порога сундук, а рядом хозяин» — пока сундук не открыт
+    if (e === 'rowdy') return w.rowdy.gone ? null : (S.pos.rowdy || 'hall');
+    if (e === 'lizard') return 'hall'; // «усатый человек у окна»
+    return null;
+  };
+  Game.prototype.placeIn = function (e, zone) { // клетка зоны: у Габа — рядом с ним (подсел), дом фигуры, иначе ближайшая к якорю
+    var occ = this.occupied(e), who = whoOf(e), home = G.HOME[e] && G.HOME[e][zone], gc = this.cellOf('gab');
+    if (zone === 'corner' && e !== 'gab' && ORDER.indexOf(e) >= 0 && gc >= 0 && G.zoneOf(gc) === 'corner') { var nr = G.near([gc], G.idx(G.ANCHOR.door), who, occ); if (nr) return nr.cell; }
+    if (home != null && !occ[G.idx(home)] && G.walkable(G.idx(home), who)) return G.idx(home);
+    return G.freeInZone(zone, G.idx(G.ANCHOR[zone]), who, occ);
+  };
+  Game.prototype.syncCells = function (before, still) { // still — только расставить, стража не шагает (после hurt / wake)
+    var S = this.S, self = this;
+    if (!S.c) S.c = '..........';
+    if (before && before.pc !== S.pc) { // арест: ход перешёл к другому герою — зоны берём из клеток
+      ORDER.forEach(function (h) { var c = self.cellOf(h); if (c >= 0 && h !== S.pc) S.pos[h] = G.zoneOf(c); });
+      var cp = this.cellOf(S.pc); if (cp >= 0) S.at = G.zoneOf(cp);
+    }
+    [S.pc].concat(ENT.filter(function (e) { return e !== S.pc; })).forEach(function (e) {
+      if (whoOf(e) === 'guard') return;
+      var want = self.entPlace(e), c = self.cellOf(e);
+      if (!want) { if (c >= 0) self.setCell(e, -1); return; }
+      if (c >= 0 && G.zoneOf(c) === want) return;
+      var ix = self.placeIn(e, want); self.setCell(e, ix == null ? -1 : ix);
+      if (ix != null && c !== ix) self.moves.push({ e: e, from: c >= 0 ? G.name(c) : null, to: G.name(ix), path: [c >= 0 ? G.name(c) : null, G.name(ix)].filter(Boolean), story: true });
+    });
+    if (!still) this.moveGuards(before);
+  };
+  Game.prototype.moveGuards = function (before) { // стража входит по одному: на ходу входа — первый в дверях, дальше каждый ход шаг вперёд и входит следующий
+    var S = this.S, self = this, gs = ['g1', 'g2', 'g3'];
+    if (!S.w.guards) return;
+    var entering = !before || !before.w.guards;
+    if (!entering) gs.forEach(function (g, k) {
+      var c = self.cellOf(g); if (c < 0) return;
+      var tgt = self.cellOf(ORDER[k]); if (tgt < 0) tgt = self.cellOf('gab');
+      if (tgt < 0) return;
+      var nr = G.near([tgt], c, 'guard', self.occupied(g));
+      if (nr && nr.path.length > 1 && !self.occupied()[nr.path[1]]) { self.setCell(g, nr.path[1]); self.moves.push({ e: g, from: G.name(c), to: G.name(nr.path[1]), path: [G.name(c), G.name(nr.path[1])], story: true }); }
+    });
+    var next = gs.filter(function (g) { return self.cellOf(g) < 0; })[0];
+    if (next && !self.occupied()[G.DOOR]) { self.setCell(next, G.DOOR); self.moves.push({ e: next, from: null, to: G.name(G.DOOR), path: [G.name(G.DOOR)], story: true }); }
+  };
+  // Дойти до цели: tgt — id предмета / фигуры / зоны. { from, to, path, zoneFrom, zoneTo, same } или null, если некуда
+  Game.prototype.walkTo = function (e, tgt) {
+    var S = this.S, who = whoOf(e), from = this.cellOf(e), occ = this.occupied(e), tcells = null, zone = null, to = null, path = null, nr;
+    if (from < 0) return null;
+    if (tgt === 'guard') tgt = 'g1';
+    var stay = function () { var z = G.zoneOf(from); return { from: from, to: from, path: [from], zoneFrom: z, zoneTo: z, same: true }; };
+    if (tgt === e) return stay();
+    if (ENT.indexOf(tgt) >= 0) { var tc = this.cellOf(tgt); if (tc < 0) return null; tcells = [tc]; }
+    else if (tgt === 'tables') {
+      var best = null; ['table', 'table2', 'table3', 'table4', 'table5'].forEach(function (id) { if (G.OBJ[id].ix.some(function (t) { return G.cheb(from, t) <= 1; })) best = best || { stay: true }; var r = G.near(G.OBJ[id].ix, from, who, occ); if (r && (!best || best.stay || r.path.length < best.path.length)) best = r; });
+      if (!best) return null; if (best.stay) return stay(); to = best.cell; path = best.path;
+    }
+    else if (GO_OBJ[tgt]) tcells = GO_OBJ[tgt] === 'door' ? [G.DOOR] : G.OBJ[GO_OBJ[tgt]].ix;
+    else zone = G.ANCHOR[tgt] ? tgt : PLACE_OF[tgt];
+    if (tcells) {
+      if (tcells.some(function (t) { return t !== from && G.cheb(from, t) <= 1; })) return stay();
+      nr = G.near(tcells, from, who, occ); if (!nr) return null; to = nr.cell; path = nr.path;
+    } else if (zone) {
+      if (G.zoneOf(from) === zone) return stay();
+      var home = e === 'gab' && zone === 'corner' ? G.idx(G.HOME.gab.corner) : null;
+      to = home != null && !occ[home] ? home : G.freeInZone(zone, G.idx(G.ANCHOR[zone]), who, occ);
+      if (to == null) return null;
+      var res = G.bfs(from, who, null); if (res.dist[to] == null) return null; path = G.path(res, to);
+    }
+    if (to == null) return null;
+    var zt = G.zoneOf(to);
+    this.setCell(e, to);
+    if (e === S.pc) S.at = zt; else if (ORDER.indexOf(e) >= 0) S.pos[e] = zt;
+    this.moves.push({ e: e, from: G.name(from), to: G.name(to), path: path.map(G.name), cost: (path.length - 1) * G.MOVE.costPerStep });
+    return { from: from, to: to, path: path, zoneFrom: G.zoneOf(from), zoneTo: zt, same: false };
+  };
+
   function isPerson(id) { return id === 'host' || id === 'rowdy' || id === 'lizard' || id === 'guard' || id === 'crowd' || ORDER.indexOf(id) >= 0; }
   Game.prototype.weaponId = function () { return HEROES[this.S.pc].weapon; };
   // оружие под рукой? меч/нож/лук — только если лежит у героя; в сундуке — нет (правило таверны)
@@ -555,14 +650,16 @@
     if (tgt === 'door' && S.at === 'door' && S.phase !== 'door') { this.say('Ты и так у двери.'); return {}; }
     if (S.phase === 'door') {
       var pl0 = this.placeOf(tgt); if (pl0 && pl0 !== 'door') { this.say('Хозяин перекрывает вход рукой: — С оружием — нельзя. Сначала сундук.'); this.spend(0); return { refuse: true }; }
-      this.say('Ты и так у двери; дальше — только после сундука.'); return {};
+      this.walkTo(S.pc, tgt); this.say('Ты и так у двери; дальше — только после сундука.'); return {};
     }
     var pl = this.placeOf(tgt);
     if (pl === 'corner') S.f.satWithGab = true;
     if (!pl) { this.say('Туда не пройти.'); return { ok: false }; }
-    if (S.at === pl) { this.say('Ты и так там.'); return {}; }
-    S.at = pl; this.spend(1);
-    this.say(this.pick(['Ты пробираешься ', 'Ты идёшь ', 'Ты протискиваешься ']) + { door: 'к двери', hall: 'в середину зала', corner: 'в угол, к большому столу', bar: 'к стойке' }[pl] + '.');
+    var mv = this.walkTo(S.pc, tgt);
+    if (!mv) { this.say('Туда не пройти.'); return { ok: false }; }
+    if (mv.same) { this.say('Ты и так там.'); return {}; }
+    this.spend(1);
+    this.say(this.pick(['Ты пробираешься ', 'Ты идёшь ', 'Ты протискиваешься ']) + this.goText(tgt, pl, true) + '.');
     if (S.phase === 'brawl') this.say('Мимо пролетает табурет. Ты успеваешь пригнуться.');
     return {};
   };
@@ -571,7 +668,8 @@
     if (S.phase === 'door') return this.h_go(A, { raw: '' });
     var tgt = A.target || A.person || A.dst || A.item || 'table';
     var pl = this.placeOf(tgt) || 'corner';
-    S.at = pl; this.spend(1);
+    if (!this.walkTo(S.pc, tgt === 'table' && S.pc === 'gab' ? 'corner' : this.placeOf(tgt) ? tgt : 'corner')) { this.say('Туда не сесть: там занято.'); return {}; }
+    this.spend(1);
     if (S.pc === 'mage' && S.beat === 0 && S.sub === 1) { S.f.satWithGab = true; return {}; }
     if (tgt === 'gab' || tgt === 'table' || pl === 'corner') this.say(S.pc === 'gab' ? 'Ты сидишь у себя в углу, спиной к стене. Всё как обычно.' : 'Ты подсаживаешься к большому столу в углу. {g:Здоровяк|Валькирия} не поднимает глаз, но кружку придвигает к себе.');
     else if (isPerson(tgt) && tgt !== 'crowd') this.say('Ты подходишь к ' + (ORDER.indexOf(tgt) >= 0 ? this.T('%' + tgt + '~%') : (NAMES[tgt] || tgt)) + ' и садишься рядом.');
@@ -592,7 +690,8 @@
     if (S.phase === 'evening') { this.say('Дверь — вот она. Но ты пришёл{p:|ла} сюда не для того, чтобы уйти до конца вечера.'); this.spend(0); return; }
     if (S.phase === 'brawl') {
       this.spend(1);
-      if (S.w.door.prop) return this.say('Дверь подпёрта — снаружи стучат. Уйти через неё не получится: она теперь и защита, и клетка.');
+      if (S.w.door.prop) { this.walkTo(S.pc, 'door'); return this.say('Дверь подпёрта — снаружи стучат. Уйти через неё не получится: она теперь и защита, и клетка.'); }
+      this.walkTo(S.pc, 'door');
       this.say('Ты кидаешься к двери — и упираешься в спины стражи, которая как раз входит. Далеко не убежишь.');
       S.b.round = Math.max(S.b.round, S.b.guardsAt - 1);
       return;
@@ -605,6 +704,7 @@
     var r = this.roll('спрятаться', S.pc, 'dex', 11, { bonus: (S.pc === 'nobby' || S.pc === 'elf' ? 2 : 0) + draft, bonusWhy: 'ловкость/скрытность' + (draft ? '; сквозняк у открытой двери −1' : '') });
     this.fx(r, 'hide');
     S.hidden = r.ok;
+    if (S.phase !== 'door') this.walkTo(S.pc, 'tables'); // «ныряешь под стол» — к ближайшему столу
     if (S.phase === 'brawl') { S.b.ally -= 0; }
     if (r.ok) this.say('Ты ныряешь под стол — и ты часть тени. Мимо проносятся сапоги.');
     else this.say('Ты ныряешь под стол — и встречаешь там чьё-то колено и чей-то нос. Тут тесно.');
@@ -931,7 +1031,7 @@
     var S = this.S;
     if (S.phase === 'door') { this.spend(0); return this.say('Сначала пройди в зал: хозяин не пустит с оружием.'); }
     if (S.beat > 2) { this.spend(0); return this.say('Кошелёк уже у тебя. Его надо беречь.'); }
-    this.approach('corner');
+    this.approach('gab');
     this.beatPurse(true, A);
   };
   Game.prototype.steal_book = function (A) {
@@ -1303,6 +1403,7 @@
     if (S.pc === 'nobby') this.say(this.T('Пробегая мимо мага, ты замечаешь книгу на цепочке — тяжёлую, толстую, дорогую. «Книжка-то дороже кошелька», — думаешь ты.'));
     else if (S.pc !== 'mage') this.say(this.T('Пробегая мимо мага, %nobby% косится на книгу: — Книжка-то дороже кошелька.'));
     else this.say(this.T('Мимо тебя пролетает воришка, косится на книгу: — Книжка-то дороже кошелька, — бросает {n:он|она} на бегу. Ты хватаешься за цепочку — на месте.'));
+    this.walkTo('nobby', 'rowdy'); // «пролетает под рукой задиры и сбивает его с ног» — вор рядом с задирой
     S.rowdyDown = true; w.rowdy.down = true;
     // драка начинается следующим ходом: реплика ≤ 1024 знаков (платформа Алисы), а кража и «Держи вора!» не в одном абзаце
     S.t = byPC ? -1 : 0;
@@ -1359,7 +1460,7 @@
   };
   Game.prototype.guardsEnter = function () {
     var S = this.S, w = S.w, b = S.b;
-    w.guards = true; S.phase = 'arrest'; S.hidden = false; S.pos.guard = 'door'; w.door.open = true; w.rowdy.gone = true; S.pos.rowdy = null;
+    w.guards = true; S.phase = 'arrest'; S.hidden = false; w.door.open = true; w.rowdy.gone = true; S.pos.rowdy = null;
     var held = b.ally >= 3;
     b.result = held ? 'held' : 'lost';
     // ТЕКСТ — черновик Диалогов (dialogue_s1_arrest.md, (а), вариант Б «свой мастер»); Алексей ещё не утвердил
@@ -1488,6 +1589,9 @@
     S.f.arrestDone = true;
     team.dec[hero] = { kind: kind, how: how, by: how === 'idle' ? 'idle' : 'word' };
     this.arrestLine(hero, kind, how, A, c);
+    // фишка идёт туда, куда говорит текст: бросок — к стражнику, бег — к двери / окну / под стол, уговоры — к капитану; покорность — на месте
+    var goal = kind === 'resist' && how !== 'throw' ? 'guard' : kind === 'run' ? (how === 'window' ? 'window' : how === 'hide' ? 'tables' : 'door') : kind === 'plead' ? 'lizard' : null;
+    if (goal) this.walkTo(hero, goal);
     if (kind === 'resist') { // rolls.md §5, вопрос 3А (рабочий вариант, обратимо): контакт — «ранен» (Габ −5, остальные −3); бросок предмета −2; упор −1
       var cost = (how === 'strike' || how === 'spark') ? (hero === 'gab' ? 5 : 3) : how === 'throw' ? 2 : 1;
       this.hurt(hero, Math.min(cost, S.hp[hero] - 1)); S.f.team.dec[hero].cost = cost; // минимум 1 здоровья (rolls.md §5)
@@ -1565,10 +1669,16 @@
 
   Game.prototype.viewState = function () {
     var S = this.S, w = S.w, self = this;
-    var figs = [];
-    ORDER.forEach(function (h) { if (S.f.ko && S.f.ko.indexOf(h) >= 0) return; figs.push({ id: h, name: self.gname(h), place: h === S.pc ? S.at : S.pos[h], pc: h === S.pc, color: HEROES[h].color, hp: S.hp[h], hpMax: HEROES[h].hp }); });
-    ['host', 'lizard', 'rowdy'].forEach(function (id) { if (S.pos[id] && !(id === 'rowdy' && w.rowdy.gone)) figs.push({ id: id, name: NAMES[id], place: S.pos[id], color: id === 'lizard' ? '#c9a45c' : id === 'host' ? '#9a8b72' : '#8a4a4a', hp: id === 'lizard' ? w.lizard.hp : id === 'rowdy' ? w.rowdy.hp : null }); });
-    if (w.guards) figs.push({ id: 'guard', name: 'стража', place: 'door', color: '#5a6a7a' });
+    var figs = [], hp3 = function (h) { return S.hp[h] * 3 <= HEROES[h].hp * 2; }; // «ранен» — здоровье ≤ ⅔ (states.md §1)
+    ENT.forEach(function (e) {
+      var c = self.cellOf(e); if (c < 0) return;
+      var f = { id: e, cell: G.name(c), pos: c, marks: [], pc: e === S.pc };
+      if (ORDER.indexOf(e) >= 0) { f.name = self.gname(e); f.color = HEROES[e].color; f.hp = S.hp[e]; f.hpMax = HEROES[e].hp; f.place = e === S.pc ? S.at : S.pos[e]; if (hp3(e)) f.marks.push('wound'); if (e === S.pc && S.hidden) f.marks.push('hide'); }
+      else { f.name = e === 'host' ? 'хозяин' : e === 'rowdy' ? 'задира' : e === 'lizard' ? 'капитан Лизард' : 'стража'; f.place = G.zoneOf(c);
+        if (e === 'lizard') { f.hp = w.lizard.hp; if (w.lizard.down) f.marks.push('stun'); if (w.lizard.hp <= 6) f.marks.push('wound'); }
+        if (e === 'rowdy') { f.hp = w.rowdy.hp; if (w.rowdy.down) f.marks.push('stun'); } }
+      figs.push(f);
+    });
     return { figs: figs, at: S.at, phase: S.phase, inv: S.inv.slice(), held: S.held, mana: S.pc === 'mage' ? S.mana : null, hp: S.hp[S.pc], hpMax: HEROES[S.pc].hp, ended: S.ended, weaponIn: S.weaponIn, door: w.door, stools: w.stools, mugs: w.mugs, chestHas: w.chest.has };
   };
 

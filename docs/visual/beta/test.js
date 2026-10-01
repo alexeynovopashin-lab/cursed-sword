@@ -83,7 +83,7 @@ function play(pc, gender, lines, seed) {
 var SCRIPTS = {
   gab: ['осмотреться', 'слушаю', 'жду', 'жду', 'жду', 'жду', 'иду к стойке', 'беру стол', 'бью капитана столом', 'закрываюсь', 'бью задиру', 'жду', 'жду', 'жду', 'жду', 'молчу', 'жду'],
   elf: ['кладу лук в сундук', 'иду к стойке', 'угощаю всех', 'отвечаю задире: не надо', 'жду', 'бросаю вилку в капитана', 'прячусь под стол', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду'],
-  mage: ['кладу нож в сундук', 'подсаживаюсь к меченосцу', 'жду', 'жду', 'жду', 'жгу усы капитану', 'лечу Габа', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду'],
+  mage: ['кладу нож в сундук', 'подсаживаюсь к меченосцу', 'жду', 'жду', 'жду', 'жгу усы капитану', 'лечу Габа', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду'],
   nobby: ['кладу нож в сундук', 'кладу перчатки в сундук', 'жду', 'срезаю кошелёк осторожно', 'швыряю миску молока в капитана', 'бью задиру', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду']
 };
 ['gab', 'elf', 'mage', 'nobby'].forEach(function (pc) {
@@ -132,7 +132,9 @@ var SCRIPTS = {
   var r = g.turns[0];
   ok(r.trace.clauses.length === 3, 'цепочка из трёх действий разобрана');
   ok(g.S.w.door.prop === 2, 'дверь подпёрта сундуком (Габ поднимает сундук)', JSON.stringify(g.S.w.door));
-  ok(g.S.b.guardsAt === 7, 'подпёртая дверь задерживает стражу на 2 раунда', String(g.S.b.guardsAt));
+  ok(g.S.w.door.pOpen === 1 && g.S.b.guardsAt === 4, 'после «толкаю дверь» она открыта: подпёртая открытой — стража на ход раньше (rolls.md §4)', String(g.S.b.guardsAt));
+  var gc = play('gab', 'm', ['беру сундук и подпираю']);
+  ok(gc.S.w.door.prop === 2 && !gc.S.w.door.pOpen && gc.S.b.guardsAt === 7, 'закрытая дверь, подпёртая сундуком, задерживает стражу на 2 раунда', String(gc.S.b.guardsAt));
 })();
 // ответ на вопрос «чем подпереть»
 (function () {
@@ -367,7 +369,7 @@ ALL.forEach(function (pc) {
   });
   var g = toArrest('gab', 11); g.input('бью капитана, потом сдаюсь');
   ok(g.S.f.arrest === 'resist', 'арест: в цепочке решает первое действие', JSON.stringify(g.S.f.arrest));
-  var h = toArrest('gab', 11); var hp = h.S.hp.gab; h.input('бью капитана и бью капитана'); ok(h.S.hp.gab === hp - 2, 'арест: здоровье списано один раз за ход', hp + ' → ' + h.S.hp.gab);
+  var h = toArrest('gab', 11); var hp = h.S.hp.gab; h.input('бью капитана и бью капитана'); ok(h.S.hp.gab === hp - 5, 'арест: здоровье списано один раз за ход (контакт: Габ −5, «ранен»)', hp + ' → ' + h.S.hp.gab);
 })();
 
 
@@ -614,7 +616,7 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
   ok(!bad.length && n > 100, '3.2: ни одной заглушки [ТЕКСТ] и скобки-подсказки в ответах (' + n + ' фраз × 4 героя × вечер/драка)', bad.slice(0, 3).join(' || '));
   ok(draft > 50, '3.2: ответы по строкам Диалогов помечены «черновик» в записи хода', draft + ' из ' + n);
   var src = require('fs').readFileSync(__dirname + '/game.js', 'utf8');
-  ok(!/\[ТЕКСТ\]|STUB/.test(src), '3.2: в game.js нет заглушек [ТЕКСТ] и STUB');
+  ok(!/STUB/.test(src) && (src.match(/NOTEXT \+/g) || []).length <= 3, '3.2: в game.js нет STUB; метка [ТЕКСТ] — только у новых случаев без слов (≤3)');
   ok(!/\(Три действия|\(Кошелёк/.test(src), '3.2: в game.js нет подсказок в скобках');
   // пределы: полная ≤140, короткая ≤60 — для 16 сочетаний полов, 4 героев игрока, слова «X» в 20 знаков
   var over = [], cnt = 0, REF = CS.REF;
@@ -639,6 +641,115 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
   ok(/[Кк]ошелёк Габа звякает слева/.test(allText(nb)), '3.2: подсказка Нобби про кошелёк Габа — словами ведущего', '');
   var q = gameOf('gab', 5); q.input('осматриваюсь, слушаю, жду, иду к стойке, беру кружку');
   ok(/За ход успеваешь три дела|Три дела за ход/.test(lastText(q)) && q.turns[0].notes.join(' ').indexOf('очередь') >= 0 && q.S.queue.length >= 1, '3.2: больше трёх действий — строка ведущего без скобок, очередь видна в панели', lastText(q));
+})();
+
+// ======================================================================
+// Шаг 3.3: числа Механик (rolls.md §9): открытая дверь, «отвлечь», цена сопротивления, лечение, книга, крит и единица, урон Габа, шок
+// ======================================================================
+function lastRolls(g) { return g.turns[g.turns.length - 1].rolls; }
+function notesOf(g) { return g.turns[g.turns.length - 1].notes.join(' | '); }
+(function () {
+  // — подпереть открытой: сквозняк у открытой двери (−1 вору и Эллион)
+  var g = gameOf('nobby', 3); OPEN.nobby.forEach(function (l) { g.input(l); }); advance(g, 'brawl'); g.S.w.door.pOpen = 1; g.input('прячусь под стол');
+  var rh = lastRolls(g).filter(function (r) { return /спрятаться/.test(r.label); })[0];
+  ok(rh && rh.mod === 5, '3.3: открытая подпёртая дверь: у Нобби скрытность 4+2−1 = 5', rh && rh.mod);
+  var g2 = gameOf('nobby', 3); OPEN.nobby.forEach(function (l) { g2.input(l); }); advance(g2, 'brawl'); g2.input('прячусь под стол');
+  ok(lastRolls(g2).filter(function (r) { return /спрятаться/.test(r.label); })[0].mod === 6, '3.3: закрытая дверь: скрытность Нобби 4+2 = 6');
+  var o = gameOf('gab', 41); o.input('толкаю дверь'); o.input('беру табурет'); o.input('подпираю дверь'); // табурет, дверь открыта
+  ok(o.S.w.door.pOpen === 1 && o.S.w.door.open === true && /\[ТЕКСТ\]/.test(lastText(o)), '3.3: подпереть открытой — дверь остаётся открытой, слов Диалогов нет → метка «ТЕКСТ»', JSON.stringify(o.S.w.door) + lastText(o));
+  advance(o, 'brawl'); ok(o.S.b.guardsAt === 4, '3.3: открытая подпёртая — стража на ход раньше (4 вместо 5)', String(o.S.b.guardsAt));
+  var pu = gameOf('gab', 41); pu.input('толкаю дверь'); pu.input('беру табурет'); pu.input('подпираю дверь'); pu.input('толкаю дверь');
+  ok(/и так открыта/.test(lastText(pu)), '3.3: толкать открытую подпёртую дверь — «и так открыта»', lastText(pu));
+})();
+(function () {
+  // — «отвлечь»: бросок Духа против 10, успех — отвлечён до конца следующего хода: атака +2, подлый удар Нобби +d6
+  var seen = { ok: 0, bad: 0 }, rolls = 0, bon = 0, sneak = 0, wrong = [];
+  for (var seed = 1; seed <= 80; seed++) {
+    var g = gameOf('nobby', seed); OPEN.nobby.forEach(function (l) { g.input(l); }); if (!advance(g, 'brawl')) continue;
+    g.S.w.lizard.hp = 99; g.S.b.sigQueue = []; g.S.b.round = 0; g.S.b.guardsAt = 40;
+    g.input('отвлекаю капитана'); var r = lastRolls(g).filter(function (x) { return /отвлечь/.test(x.label); })[0];
+    if (!r) { wrong.push('нет броска ' + seed); continue; }
+    rolls++;
+    if (r.dc !== 10 || r.stat !== 'cha') wrong.push('порог/стат ' + r.dc + r.stat);
+    if (r.ok !== !!g.S.f.dv) wrong.push('флаг не совпал с исходом, зерно ' + seed);
+    if (r.ok) {
+      seen.ok++; g.input('бью капитана'); var a = lastRolls(g).filter(function (x) { return /удар/.test(x.label) && !x.dmg; })[0];
+      if (a && /отвлечён/.test(a.bonusWhy || '') && a.mod === 4 + 2 + 0) bon++; else if (a) wrong.push('нет +2 на атаку: ' + JSON.stringify(a));
+      if (a && a.ok && lastRolls(g).some(function (x) { return x.label === 'подлый удар'; })) sneak++;
+      if (g.S.f.dv) wrong.push('отвлечение не снялось после атаки');
+    } else seen.bad++;
+  }
+  ok(!wrong.length && rolls > 20 && seen.ok && seen.bad, '3.3: «отвлечь» — Дух против 10 (успехов ' + seen.ok + ', провалов ' + seen.bad + '); флаг совпадает с кубиком', wrong.slice(0, 3).join(' | '));
+  ok(bon === seen.ok, '3.3: после успешного «отвлечь» следующая атака +2 (' + bon + ' из ' + seen.ok + ')');
+  ok(sneak > 0, '3.3: у Нобби по отвлечённой цели — подлый удар +d6 (' + sneak + ' раз)');
+  var h = gameOf('gab', 5); advance(h, 'arrest'); h.input('отвлекаю капитана'); ok(!h.S.f.dv && /терпение/.test(JSON.stringify(h.turns[h.turns.length - 1].trace)) , '3.3: в аресте «отвлекаю» — не бонус, а ход без решения (терпение −1)', JSON.stringify(h.S.f.idle));
+})();
+(function () {
+  // — цена сопротивления: «ранен» (Габ −5, остальные −3); бросок предмета −2; упор −1 (rolls.md §5)
+  var HP = { gab: 14, elf: 9, mage: 8, nobby: 7 }, TH = { gab: 9, elf: 6, mage: 5, nobby: 4 }, bad = [];
+  ALL.forEach(function (pc) {
+    var x = toArrest(pc, 11); x.input('бью стражника'); var cost = HP[pc] - x.S.hp[pc];
+    if (cost !== (pc === 'gab' ? 5 : 3)) bad.push(pc + ' контакт −' + cost);
+    if (x.S.hp[pc] > TH[pc]) bad.push(pc + ' после контакта не «ранен»: ' + x.S.hp[pc]);
+    var t = toArrest(pc, 11); t.input('швыряю табурет в стражника'); if (HP[pc] - t.S.hp[pc] !== 2) bad.push(pc + ' бросок −' + (HP[pc] - t.S.hp[pc]));
+    var u = toArrest(pc, 11); u.input('упираюсь'); if (HP[pc] - u.S.hp[pc] !== 1) bad.push(pc + ' упор −' + (HP[pc] - u.S.hp[pc]));
+    var c = toArrest(pc, 11); c.input('сдаюсь'); if (c.S.hp[pc] !== HP[pc]) bad.push(pc + ' покорность −' + (HP[pc] - c.S.hp[pc]));
+  });
+  ok(!bad.length, '3.3: цена сопротивления: контакт — «ранен» (Габ −5, остальные −3), бросок −2, упор −1, покорность 0', bad.join('; '));
+  var m = new G({ pc: 'gab', seed: 11, players: ['gab', 'mage'], genders: {} }); advance(m, 'arrest'); m.input('Габ бьёт стражника');
+  ok(m.S.hp.gab === 9 && /ранен/.test(notesOf(m)), '3.3: команда: Габ ранен (9 из 14), в панели слово «ранен» помечено ТЕКСТ', m.S.hp.gab + ' ' + notesOf(m));
+})();
+(function () {
+  // — лечение: капитана не проходит, здорового нет (сила не тратится), раненого — да
+  var g = gameOf('mage', 5); OPEN.mage.forEach(function (l) { g.input(l); }); g.S.w.lizard.hp = 4; var m0 = g.S.mana; g.input('лечу капитана');
+  ok(g.S.w.lizard.hp === 4 && g.S.mana === m0 && /лекарь его светлости/.test(lastText(g)) && !/боль уходит/.test(lastText(g)), '3.3: «лечу капитана» не проходит: здоровье и сила прежние, отказ с причиной', lastText(g));
+  var t0 = g.S.turn; g.input('лечу Габа'); ok(g.S.mana === m0 && /лечить нечего/.test(lastText(g)), '3.3: «лечу Габа» (здоров) — лечить нечего, сила не тратится', lastText(g) + ' mana ' + g.S.mana);
+  g.S.hp.gab = 9; g.input('лечу Габа'); ok(g.S.mana === m0 - 1 && g.S.hp.gab > 9, '3.3: раненый Габ (9/14) — лечится, сила −1', g.S.hp.gab + ' mana ' + g.S.mana);
+  g.S.hp.gab = 10; var mm = g.S.mana; g.input('лечу Габа'); ok(g.S.mana === mm, '3.3: граница: 10 из 14 — не ранен, лечить нечего', '');
+})();
+(function () {
+  // — кража книги: в серии 1 не бросок
+  var bad = [];
+  for (var seed = 1; seed <= 30; seed++) { var g = gameOf('nobby', seed); OPEN.nobby.forEach(function (l) { g.input(l); }); g.input('срезаю книгу');
+    var rs = lastRolls(g); if (rs.some(function (r) { return r.die != null; })) bad.push('бросок, зерно ' + seed); if (!/Ещё не время/.test(lastText(g))) bad.push('текст, зерно ' + seed); if (!rs.some(function (r) { return r.auto; })) bad.push('нет строки «по сюжету»'); }
+  ok(!bad.length, '3.3: кража книги в серии 1 — без броска, всегда «Ещё не время» (30 зёрен)', bad.slice(0, 3).join('; '));
+})();
+(function () {
+  // — крит и единица с эффектом (находка 34)
+  var crit = 0, fum = 0, bad = [], castCrit = 0, castFum = 0;
+  for (var seed = 1; seed <= 600; seed++) {
+    var g = gameOf(seed % 2 ? 'gab' : 'mage', seed); OPEN[g.S.pc].forEach(function (l) { g.input(l); }); if (!advance(g, 'brawl')) continue;
+    g.S.w.lizard.hp = 99; g.S.b.sigQueue = []; g.S.b.guardsAt = 60; g.S.b.round = 0; g.S.f.dz = null; delete g.S.f.dz;
+    var mana = g.S.mana, held = null;
+    g.input(g.S.pc === 'gab' ? 'беру табурет' : 'жгу усы капитану'); if (g.S.pc === 'gab') { held = g.S.held; g.S.w.lizard.hp = 99; g.input('бью капитана табуретом'); }
+    var atk = lastRolls(g).filter(function (r) { return /удар|заклинание/.test(r.label) && !r.dmg; })[0]; if (!atk) continue;
+    var dmgs = lastRolls(g).filter(function (r) { return r.dmg; }).length, nt = notesOf(g);
+    if (atk.die === 20) { crit++; if (g.S.pc === 'gab') { if (dmgs < 2 || !g.S.f.dz || !/20: урон дважды/.test(nt)) bad.push('крит без эффекта, зерно ' + seed); } else { castCrit++; if (g.S.mana !== mana || !/не тратит силу/.test(nt)) bad.push('крит мага без эффекта, зерно ' + seed + ' mana ' + g.S.mana + '/' + mana); } }
+    if (atk.die === 1) { fum++; if (atk.ok) bad.push('единица = успех, зерно ' + seed); else if (g.S.pc === 'gab') { if (g.S.held === 'stool' || !/1: вещь потеряна/.test(nt)) bad.push('единица: табурет остался в руках, зерно ' + seed); } else { castFum++; if (g.S.mana !== mana - 1) bad.push('единица мага: сила не потрачена ' + g.S.mana + '/' + mana + ' зерно ' + seed); } }
+  }
+  ok(!bad.length && crit >= 10 && fum >= 10, '3.3: двадцатка и единица в драке имеют эффект (двадцаток ' + crit + ', единиц ' + fum + ', магия: ' + castCrit + '/' + castFum + ')', bad.slice(0, 3).join(' | '));
+  // единица без вещи — следующий бросок −2; шум у воровства
+  var st = 0, stBad = [];
+  for (seed = 1; seed <= 400 && st < 5; seed++) { var h = gameOf('gab', seed); if (!advance(h, 'brawl')) continue; h.S.w.lizard.hp = 99; h.S.b.sigQueue = []; h.S.b.guardsAt = 60; h.S.b.round = 0;
+    h.input('бью капитана'); var ar = lastRolls(h).filter(function (r) { return /удар/.test(r.label) && !r.dmg; })[0]; if (ar && ar.die === 1) { st++; if (h.S.f.st !== 'gab') stBad.push('нет флага'); h.input('бью капитана'); var nx = lastRolls(h).filter(function (r) { return /удар/.test(r.label) && !r.dmg; })[0]; if (nx && !/споткнул/.test(nx.note)) stBad.push('штраф −2 не применён'); } }
+  ok(st >= 3 && !stBad.length, '3.3: единица без вещи — споткнулся: следующий бросок −2 (' + st + ' случаев)', stBad.join('; '));
+  var nz = 0, nzBad = [];
+  for (seed = 1; seed <= 500 && nz < 4; seed++) { var p = gameOf('nobby', seed); OPEN.nobby.forEach(function (l) { p.input(l); }); p.input('срезаю кошелёк'); var pr = lastRolls(p)[0]; if (pr && pr.die === 1) { nz++; if (p.S.f.noise !== 1) nzBad.push('нет шума'); advance(p, 'brawl'); if (p.S.b.guardsAt !== 4) nzBad.push('стража не на ход раньше: ' + p.S.b.guardsAt); } }
+  ok(nz >= 2 && !nzBad.length, '3.3: единица при краже — шум: стража на ход раньше (' + nz + ' случаев)', nzBad.join('; '));
+})();
+(function () {
+  // — урон Габа d10+2 мечом (в таверне меч в сундуке; правило готово для серий с мечом); шок Эллион — флаг без штрафа
+  var wd = 0, wdBad = [];
+  for (var seed = 1; seed <= 100 && wd < 8; seed++) { var g = gameOf('gab', seed); advance(g, 'brawl'); g.S.weaponIn = false; g.S.inv.push('sword'); g.S.w.lizard.hp = 99; g.S.b.sigQueue = []; g.S.b.guardsAt = 60; g.S.b.round = 0;
+    g.input('бью капитана мечом'); var d = lastRolls(g).filter(function (r) { return r.dmg; })[0]; if (d) { wd++; if (d.sides !== 10 || d.mod !== 2 || d.label !== 'урон мечом') wdBad.push(JSON.stringify(d)); } }
+  ok(wd >= 5 && !wdBad.length, '3.3: меч Габа в руках — урон d10+2 (' + wd + ' ударов)', wdBad[0]);
+  var tb = gameOf('gab', 3); advance(tb, 'brawl'); tb.input('беру табурет'); tb.input('бью капитана табуретом'); var td = lastRolls(tb).filter(function (r) { return r.dmg; })[0];
+  ok(!td || td.sides === 4, '3.3: в таверне урон вещи остаётся (табурет d4+1), не d10', JSON.stringify(td));
+  var sh = 0, shBad = [];
+  for (seed = 1; seed <= 300 && sh < 5; seed++) { var e = gameOf('elf', seed); OPEN.elf.forEach(function (l) { e.input(l); }); if (!advance(e, 'brawl')) continue; e.S.f.elfMissed = true; e.S.w.lizard.hp = 99; e.S.b.sigQueue = []; e.S.b.guardsAt = 60; e.S.b.round = 0;
+    e.input('беру вилку'); e.input('бросаю вилку в капитана'); var er = lastRolls(e).filter(function (r) { return !r.dmg && /бросок/.test(r.label); })[0]; if (er && er.die < 11) { sh++; if (e.S.f.shock !== 1) shBad.push('нет флага шока'); if (er.mod !== 4) shBad.push('штраф за шок: mod ' + er.mod); } }
+  ok(sh >= 2 && !shBad.length, '3.3: шок Эллион — флаг без штрафа (' + sh + ' случаев)', shBad.join('; '));
+  var ea = gameOf('elf', 3); OPEN.elf.forEach(function (l) { ea.input(l); }); advance(ea, 'brawl'); ea.input('беру вилку'); ea.input('бросаю вилку в капитана'); ok(!ea.S.f.shock, '3.3: в фазе А (18–20) шока нет');
 })();
 
 console.log('\nПроверок: ' + total + ', упало: ' + fails);

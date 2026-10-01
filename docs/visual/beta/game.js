@@ -41,6 +41,8 @@
     return out;
   }
   var DIFF_SKIP = { rng: 1, turn: 1 };
+  var WEAPON_DMG = { sword: [10, 2] }; // heroes_stats §2: меч Габа d10+2 (в таверне меч в сундуке — работает только с оружием в руках)
+  var NOTEXT = '[ТЕКСТ] '; // метка: слов у Диалогов для этого случая ещё нет (записка владельцу в SESSIONS_CHAT)
   var MAX_REPLY = 1024; // знаков в одной реплике навыка Алисы
   var MAX_INPUT = 300; // знаков в одной фразе: голос и так короче, а ответ должен уложиться в 1024
   var MAX_QUEUE = 240; // знаков в очереди «дальше» (состояние Алисы ≤ 1 КБ)
@@ -132,6 +134,8 @@
     if (hero === 'elf' && opt.attack && !S.f.elfMissed) { die = 18 + Math.floor(rngNext(S) * 3); note.push('до встречи с мечом кубик эльфийки 18–20'); }
     else die = 1 + Math.floor(rngNext(S) * 20);
     var mod = (HEROES[hero] ? HEROES[hero].mods[stat] || 0 : 0) + (opt.bonus || 0);
+    if (S.f.st === hero) { mod -= 2; note.push('споткнулся после единицы: −2 на этот бросок'); delete S.f.st; } // rolls.md §2: единица без вещи в руках
+    if (hero === 'elf' && opt.attack && S.f.elfMissed && !S.f.shock && die < 11) { S.f.shock = 1; note.push('шок Эллион: флаг (без штрафа) — ТЕКСТ нужен от Диалогов'); } // heroes_stats §3: только в фазе Б
     if (opt.adv) { var d2 = 1 + Math.floor(rngNext(S) * 20); note.push('преимущество: ' + die + '/' + d2); die = Math.max(die, d2); }
     var total = die + mod, r = { label: label, hero: hero, stat: stat, die: die, mod: mod, dc: dc, total: total, ok: total >= dc || die === 20, crit: die === 20, fumble: die === 1, note: note.join('; ') };
     if (die === 1) r.ok = false;
@@ -177,6 +181,20 @@
     this.say(t); return t;
   };
   var SPK_OF = { host: 'host', lizard: 'lizard', guard: 'lizard', rowdy: 'rowdy', gab: 'gab', elf: 'elf', mage: 'mage', nobby: 'nobby' };
+
+  // rolls.md §2: единица и двадцатка не пустые. Слов Диалогов для них нет — эффект в состоянии и в панели («ТЕКСТ нужен»).
+  Game.prototype.fx = function (r, kind) {
+    var S = this.S; if (!r || r.forced || r.auto || (!r.crit && !r.fumble)) return;
+    if (r.crit) return this.notes.push('20: чисто, узнал лишнее (' + kind + ') — ТЕКСТ нужен');
+    if (!S.f.noise) { S.f.noise = 1; if (S.phase === 'brawl') S.b.guardsAt = Math.max(S.b.round + 1, S.b.guardsAt - 1); }
+    this.notes.push('1: громко, шум — стража на ход раньше (' + kind + ') — ТЕКСТ нужен');
+  };
+  // «отвлечь» (rolls.md §4): цель отвлечена до конца следующего хода; следующая атака по ней +2 (Нобби: подлый удар +d6)
+  Game.prototype.distracted = function (who) {
+    var S = this.S, d = S.f.dv; if (!d) return false;
+    if (S.turn > d[1] + 1) { delete S.f.dv; return false; }
+    return d[0] === who;
+  };
 
   // ---- вступление --------------------------------------------------------
   Game.prototype.buildIntro = function () {
@@ -565,7 +583,9 @@
   };
   Game.prototype.h_hide = function (A) {
     var S = this.S; this.spend(1);
-    var r = this.roll('спрятаться', S.pc, 'dex', 11, { bonus: S.pc === 'nobby' || S.pc === 'elf' ? 2 : 0, bonusWhy: 'ловкость/скрытность' });
+    var draft = S.w.door.pOpen && (S.pc === 'nobby' || S.pc === 'elf') ? -1 : 0; // rolls.md §4: сквозняк у открытой двери
+    var r = this.roll('спрятаться', S.pc, 'dex', 11, { bonus: (S.pc === 'nobby' || S.pc === 'elf' ? 2 : 0) + draft, bonusWhy: 'ловкость/скрытность' + (draft ? '; сквозняк у открытой двери −1' : '') });
+    this.fx(r, 'hide');
     S.hidden = r.ok;
     if (S.phase === 'brawl') { S.b.ally -= 0; }
     if (r.ok) this.say('Ты ныряешь под стол — и ты часть тени. Мимо проносятся сапоги.');
@@ -603,6 +623,7 @@
       if (!this.approach('door')) return { refuse: true };
       this.spend(1);
       if (S.phase === 'door') { this.say('Ты толкаешь дверь: она послушно скрипит, но хозяин уже стоит в проходе. — Сначала сундук.'); return; }
+      if (w.door.pOpen) { this.say('Дверь и так открыта. Ты просто толкаешь воздух.'); return; }
       if (w.door.prop || w.door.bolt) { this.say('Дверь не поддаётся — ' + (w.door.prop ? 'её держит подпёртая тяжесть.' : 'засов задвинут.')); return; }
       if (!w.door.open) { w.door.open = true; this.say('Дверь открывается наружу; в зал вползает холод и пара снежинок. На улице пусто и тихо.'); }
       else this.say('Дверь и так открыта. Ты просто толкаешь воздух.');
@@ -667,11 +688,15 @@
     this.spend(1);
     if (tool === S.held) { S.held = null; }
     if (tool === 'chest' && w.chest.at !== 'door') w.chest.at = 'door';
-    w.door.open = false; w.door.prop = (tool === 'chest' || tool === 'table') ? 2 : 1;
+    var wasOpen = !!w.door.open; // rolls.md §4: подпереть открытой — стража на 1 ход раньше, дверь остаётся открытой
+    w.door.open = wasOpen; w.door.prop = (tool === 'chest' || tool === 'table') ? 2 : 1;
+    if (wasOpen) { w.door.pOpen = 1; this.notes.push('подпёрта открытой: стража на ход раньше (−1), бег +2 (броска бега нет), скрытность Нобби/Эллион −1'); }
+    else delete w.door.pOpen;
     S.f.prop = tool;
-    this.say(tool === 'chest' ? 'Ты вставляешь сундук под ручку двери — он встаёт враспор, как приколоченный. Теперь дверь придётся ломать.'
+    if (wasOpen) this.say(NOTEXT + 'Дверь подпёрта и остаётся открытой.');
+    else this.say(tool === 'chest' ? 'Ты вставляешь сундук под ручку двери — он встаёт враспор, как приколоченный. Теперь дверь придётся ломать.'
       : tool === 'table' ? 'Ты приваливаешь стол к двери. Он весит, как совесть.' : 'Ты подпираешь дверь табуретом. Хилый заслон, но лучше, чем ничего.');
-    S.b.guardsAt += (S.w.door.prop === 2 ? 2 : 1);
+    S.b.guardsAt += (wasOpen ? -1 : (S.w.door.prop === 2 ? 2 : 1));
   };
 
   Game.prototype.liftChest = function () {
@@ -895,10 +920,8 @@
     var S = this.S;
     this.spend(1);
     if (S.pc !== 'nobby') return this.say('Нет.');
-    var r = this.roll('потянуться к книге — не выдать себя', 'nobby', 'dex', 16, { bonus: A.manner && A.manner.careful ? 2 : 0, bonusWhy: 'осторожно' });
-    r.note = 'книгу не украсть: «ещё не время» (по сюжету); бросок решает только — заметит ли маг';
-    if (r.ok) { this.say('Нобби, ты знаешь себя: цепочка звякает — и маг рефлекторно хватается за книгу. Ты отдёргиваешь руку. Ещё не время.'); }
-    else this.say('Ты касаешься цепочки — маг бледнеет и хватается за книгу: — Это знак! — Ты отходишь с невинным видом. «Пока не сегодня», — решает Нобби.');
+    this.auto('потянуться к книге', 'по сюжету: в серии 1 книга не крадётся — «Ещё не время» (rolls.md §8), броска нет');
+    this.say('Нобби, ты знаешь себя: цепочка звякает — и маг рефлекторно хватается за книгу. Ты отдёргиваешь руку. Ещё не время.');
     S.f.eyeBook = true;
   };
 
@@ -1003,21 +1026,21 @@
     if (S.mana < 1) { this.spend(1); return this.say('Силы кончились.'); }
     if (who === 'lizard') {
       if (S.phase === 'arrest') return this.say('Ты тянешься к капитану, чтобы полечить. Лизард: — Руки прочь! Это нападение на капитана его светлости!');
-      this.spend(1); S.mana--; this.auto('лечение', 'навык мага, без броска: тратит 1 силу');
-      if (w.lizard.hp < 10) { w.lizard.hp = Math.min(10, w.lizard.hp + this.dmg('лечит', 6, 2)); w.lizard.down = false; return this.say('Ты кладёшь руки капитану на плечи, и боль уходит. Лизард: — Отставить! Капитана лечит только лекарь его светлости!'); }
-      return this.say(this.pick(['Капитан цел, просто пьян. От этого ты не лечишь.', 'Капитан цел. Лечить нечего.']));
+      this.spend(0); this.auto('лечение капитана', 'по сюжету не проходит: капитана лечит лекарь его светлости (rolls.md §6); сила не тратится');
+      return this.say('Ты тянешься к капитану. Лизард: — Отставить! Капитана лечит только лекарь его светлости!');
     }
     if (who === 'host') { this.spend(1); return this.say('Хозяин: — Я не ранен, я разорён. Это не лечится.'); }
     if (who === 'rowdy') {
       this.spend(1);
-      if (w.rowdy.hp < 8 && !w.rowdy.gone) { S.mana--; this.auto('лечение', 'навык мага, без броска: тратит 1 силу'); w.rowdy.hp = Math.min(8, w.rowdy.hp + this.dmg('лечит', 6, 2)); return this.say('Ты лечишь задире разбитую губу. Задира: — Чё, влюбился?'); }
+      if (w.rowdy.hp < 8 && !w.rowdy.gone) { S.mana--; w.rowdy.mood++; this.auto('лечение', 'навык мага, без броска: тратит 1 силу'); w.rowdy.hp = Math.min(8, w.rowdy.hp + this.dmg('лечит', 6, 2)); return this.say('Ты лечишь задире разбитую губу. Задира: — Чё, влюбился?'); }
       return this.say('Тут лечить нечего.');
     }
     if (!HEROES[who]) { this.spend(1); return this.say('Тут лечить нечего.'); }
-    this.spend(1); S.mana--;
-    this.auto('лечение', 'навык мага, без броска: лечит всегда, тратит 1 силу');
     var h = HEROES[who].hp;
-    if (S.hp[who] < h) { var d = this.dmg('лечит', 6, 2); S.hp[who] = Math.min(h, S.hp[who] + d); }
+    if (S.hp[who] > Math.floor(h * 2 / 3)) { this.spend(0); this.auto('лечение', 'не ранен (здоровье > ⅔): лечить нечего, сила не тратится, ход не потрачен (rolls.md §6)'); return this.say('Тут лечить нечего.'); }
+    this.spend(1); S.mana--;
+    this.auto('лечение', 'навык мага, без броска: тратит 1 силу');
+    var d = this.dmg('лечит', 6, 2); S.hp[who] = Math.min(h, S.hp[who] + d);
     this.say(who === 'mage' ? 'Ты кладёшь руки на ушибленное плечо — тепло. Тише. Дыши.' : this.T('Ты кладёшь руки на %' + who + '+% — тепло. «Тише. Дыши. Я здесь». %' + who + '% удивлённо моргает.'));
   };
   // П4: неизвестное дополнение — ответ про предмет (О5 «здесь такого нет», О6 «такого в мире нет»), а не молчание и не «Что взять?»
@@ -1061,7 +1084,15 @@
   Game.prototype.h_distract = function (A) {
     var S = this.S, who = A.person || A.target;
     if (!who) { this.say('Кого отвлечь?'); S.pending = { verb: 'distract', A: A, ask: 'Кого отвлечь?' }; return { ok: false }; }
-    this.spend(1); S.f.distract = who;
+    this.spend(1); var S0 = this.S, tg = SPK_OF[who] || who;
+    var down = (tg === 'lizard' && S0.w.lizard.down) || (tg === 'rowdy' && S0.w.rowdy.down);
+    if (down || this.distracted(tg)) this.auto('отвлечь', down ? 'цель оглушена — отвлекать нечего' : 'цель уже отвлечена: не складывается');
+    else {
+      var dc = 10 + (tg === 'host' && S0.w.host.cudgel ? 2 : 0) + (tg === 'lizard' && S0.w.guards ? 4 : 0);
+      var r = this.roll('отвлечь ' + (NAMES[who] || who), S0.pc, S0.held ? 'dex' : 'cha', dc, { bonus: S0.pc === 'nobby' ? 2 : 0, bonusWhy: S0.pc === 'nobby' ? 'навык «Враньё»' : '' });
+      if (r.ok) { S0.f.dv = [tg, S0.turn]; r.note = (r.note ? r.note + '; ' : '') + 'отвлечена до конца следующего хода: атака +2, у Нобби подлый удар +d6'; }
+      else if (r.fumble) r.note = (r.note ? r.note + '; ' : '') + '1: цель смотрит на тебя (вражеских бросков в бете нет — эффекта нет)';
+    }
     this.ref(10, { allow: [SPK_OF[who] || null] });
   };
   Game.prototype.h_touch = function (A, c) {
@@ -1105,12 +1136,16 @@
     if (A && A.manner && A.manner.hasty) { bonus -= 1; why += ' торопливо'; }
     if (A && A.manner && (A.manner.careful)) { bonus += 1; why += ' осторожно'; }
     var isElf = hero === 'elf';
+    var dvUsed = false;
+    if (this.distracted(tgt)) { bonus += 2; why += ' отвлечён'; dvUsed = true; delete S.f.dv; } // rolls.md §4
+    if (S.f.dz === tgt) { bonus += 2; why += ' ошарашен'; delete S.f.dz; } // rolls.md §2: после двадцатки
+    bonus = Math.max(-4, Math.min(4, bonus)); // rolls.md §1: обстановка не выше ±4
     if (hero === 'mage' && mode !== 'cast' && mode !== 'throw' && !item) bonus -= 1;
     var ac = tgt === 'lizard' ? (mode === 'cast' ? 10 : 11) : 11;
     var lbl = (mode === 'cast' ? 'заклинание' : mode === 'throw' ? 'бросок' : 'удар') + ' → ' + (tgt === 'lizard' ? 'капитан' : (NAMES[tgt] || tgt));
     if (item) lbl += ' (' + (item === 'fire' ? 'огонь' : (NAMES[item] || item)) + ')';
     res = this.roll(lbl, hero, stat, ac, { attack: isElf && (mode === 'throw' || mode === 'hit'), bonus: bonus, bonusWhy: why });
-    if (mode === 'cast') S.mana--;
+    if (mode === 'cast') { if (res.crit) this.notes.push('20: заклинание не тратит силу, огонь с запасом (+2) — ТЕКСТ нужен'); else S.mana--; }
     var nm = hero === S.pc ? 'Ты' : this.gname(hero);
     var vict = tgt === 'lizard' ? 'капитана' : tgt === 'rowdy' ? 'задиру' : (NAMES[tgt] || 'кого-то');
     if (item === 'milk') { S.w.milk = 'gone'; if (S.held === 'milk') S.held = null; }
@@ -1120,12 +1155,20 @@
 
     if (!res.ok) {
       S.b.ally -= 1;
+      if (res.fumble) { // rolls.md §2: единица — вещь в руках потеряна; нет вещи — споткнулся, следующий бросок −2; магия — сила потрачена, огонь вбок
+        if (mode === 'cast') this.notes.push('1: огонь ушёл вбок, сила потрачена — ТЕКСТ нужен');
+        else if (item && mode === 'hit' && S.held === item) { S.held = null; if (item === 'stool') S.w.stools = Math.max(0, S.w.stools - 1); this.notes.push('1: вещь потеряна (' + (NAMES[item] || item) + ') — ТЕКСТ нужен'); }
+        else if (!item) { S.f.st = hero; this.notes.push('1: споткнулся, следующий бросок −2 — ТЕКСТ нужен'); }
+      }
       if (item === 'milk') { this.say('Миска описывает красивую дугу, не долетает и бесславно разливается на чужой сапог. Молока жалко.'); return; }
       this.say(this.pick([nm === 'Ты' ? 'Ты промахиваешься: ' + (tgt === 'rowdy' ? 'задира' : 'капитан') + ' ныряет в толпу, и твой удар достаётся воздуху.' : nm + ' промахивается.', nm === 'Ты' ? 'Мимо. Кто-то толкает тебя под локоть.' : 'Мимо, и это видят все.']));
       return;
     }
     S.b.ally += 1;
-    var d = this.dmg('урон', item === 'table' ? 6 : item === 'stool' ? 4 : 3, item === 'stool' ? 1 : (hero === 'gab' ? 2 : 0));
+    var wd = WEAPON_DMG[item] && hero === 'gab' && this.hasInHand(item) ? WEAPON_DMG[item] : null;
+    var d = wd ? this.dmg('урон мечом', wd[0], wd[1]) : this.dmg('урон', item === 'table' ? 6 : item === 'stool' ? 4 : 3, item === 'stool' ? 1 : (hero === 'gab' ? 2 : 0));
+    if (res.crit) { d += wd ? this.dmg('урон ×2', wd[0], wd[1]) : this.dmg('урон ×2', item === 'table' ? 6 : item === 'stool' ? 4 : 3, item === 'stool' ? 1 : (hero === 'gab' ? 2 : 0)); S.f.dz = tgt; this.notes.push('20: урон дважды, цель ошарашена (следующая атака +2) — ТЕКСТ нужен'); }
+    if (dvUsed && hero === 'nobby') { d += this.dmg('подлый удар', 6, 0); }
     var target = tgt === 'rowdy' ? rowdy : lizard;
     if (tgt === 'lizard' || tgt === 'rowdy') { target.hp -= d; if (target.hp <= 0) { target.down = true; target.hp = 0; } }
     // фирменные приёмы
@@ -1223,8 +1266,10 @@
     if (S.pc === 'nobby') S.inv.push('purse');
     if (byPC) {
       this.spend(1);
-      var careful = S.t > 0 || (A && A.manner && A.manner.careful);
-      var r = this.roll('срезать кошелёк — тихо?', 'nobby', 'dex', 12, { adv: !!(A && A.manner && A.manner.careful), bonus: (A && A.manner && A.manner.hasty) ? -2 : 0, bonusWhy: A && A.manner && A.manner.hasty ? 'торопливо' : (A && A.manner && A.manner.careful ? 'осторожно' : '') });
+      var careful = S.t > 0 || (A && A.manner && A.manner.careful), dvb = this.distracted('gab');
+      var r = this.roll('срезать кошелёк — тихо?', 'nobby', 'dex', 12, { adv: !!(A && A.manner && A.manner.careful), bonus: ((A && A.manner && A.manner.hasty) ? -2 : 0) + (dvb ? 2 : 0), bonusWhy: (A && A.manner && A.manner.hasty ? 'торопливо' : (A && A.manner && A.manner.careful ? 'осторожно' : '')) + (dvb ? ' Габ отвлечён +2' : '') });
+      if (dvb) delete S.f.dv;
+      this.fx(r, 'кошелёк');
       S.f.purseClean = r.ok;
       r.note = (r.note ? r.note + '; ' : '') + 'кошелёк срезан в любом случае (по сюжету); бросок решает — тихо или шумно';
       var line;
@@ -1245,7 +1290,7 @@
     S.t = byPC ? -1 : 0;
   };
   Game.prototype.beatBrawlStart = function () {
-    var S = this.S; S.phase = 'brawl'; S.b.round = 0; S.beat = 4; S.b.guardsAt = 5 + (S.w.door.prop ? (S.w.door.prop === 2 ? 2 : 1) : 0);
+    var S = this.S; S.phase = 'brawl'; S.b.round = 0; S.beat = 4; S.b.guardsAt = 5 + (S.w.door.pOpen ? -1 : S.w.door.prop ? (S.w.door.prop === 2 ? 2 : 1) : 0) - (S.f.noise ? 1 : 0);
     S.w.rowdy.down = false;
     // подготовим очередь фирменных приёмов остальных
     S.b.sigQueue = ['gab', 'mage', 'nobby', 'elf'].filter(function (h) { return h !== S.pc; });
@@ -1279,7 +1324,7 @@
       this.say(this.pick(['Кружка пролетает над головой и разбивается о стену. Хозяин закрывает лицо руками.', 'Где-то справа кто-то падает, кто-то кого-то поднимает и опять роняет.', 'Табурет описывает дугу и исчезает в толпе. Приземляется в чьём-то пиве.', 'Капитан Лизард что-то орёт про закон и уважение, но его никто не слушает.', 'Посетители делятся на тех, кто дерётся, и тех, кто ставит на дерущихся.']));
     }
     // предупреждение: стража на подходе
-    if (b.round === b.guardsAt - 1) this.say(S.w.door.prop ? 'За дверью тяжёлые шаги и стук: — Именем его светлости! Открывайте! Дверь дрожит, но держит.' : 'За дверью тяжёлые шаги. Кто-то орёт: — Именем его светлости!');
+    if (b.round === b.guardsAt - 1) this.say(S.w.door.prop && !S.w.door.pOpen ? 'За дверью тяжёлые шаги и стук: — Именем его светлости! Открывайте! Дверь дрожит, но держит.' : 'За дверью тяжёлые шаги. Кто-то орёт: — Именем его светлости!');
     if (b.round >= b.guardsAt) {
       // вход стражи — самый длинный абзац: если ход уже длинный, стража входит на следующем (ответ ≤ 1024 знаков)
       if (!b.late && this.out.join('\n').length + this.guardsLen() > MAX_REPLY) { b.late = true; b.guardsAt++; }
@@ -1426,7 +1471,11 @@
     team.dec[hero] = { kind: kind, how: how, by: how === 'idle' ? 'idle' : 'word' };
     if (!S.f.arrest) { S.f.arrest = kind; S.f.arrestBy = how === 'idle' ? 'idle' : 'word'; }
     this.arrestLine(hero, kind, how, A, c);
-    if (kind === 'resist') S.hp[hero] = Math.max(1, S.hp[hero] - 2);
+    if (kind === 'resist') { // rolls.md §5, вопрос 3А (рабочий вариант, обратимо): контакт — «ранен» (Габ −5, остальные −3); бросок предмета −2; упор −1
+      var cost = (how === 'strike' || how === 'spark') ? (hero === 'gab' ? 5 : 3) : how === 'throw' ? 2 : 1;
+      S.hp[hero] = Math.max(1, S.hp[hero] - cost); S.f.team.dec[hero].cost = cost;
+      if (cost >= 3) this.notes.push(this.gname(hero) + ': ранен (−' + cost + ') — слово «ранен» для камеры: ТЕКСТ нужен');
+    }
     var left = team.order.filter(function (h) { return !team.dec[h]; });
     if (left.length) { // ход следующего героя; сцена идёт
       this.spend(0); S.pc = left[0]; this.say(this.shortCall(left[0]) );

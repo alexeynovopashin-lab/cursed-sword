@@ -83,7 +83,7 @@ function play(pc, gender, lines, seed) {
 var SCRIPTS = {
   gab: ['осмотреться', 'слушаю', 'жду', 'жду', 'жду', 'жду', 'иду к стойке', 'беру стол', 'бью капитана столом', 'закрываюсь', 'бью задиру', 'жду', 'жду', 'жду', 'жду', 'молчу', 'жду'],
   elf: ['кладу лук в сундук', 'иду к стойке', 'угощаю всех', 'отвечаю задире: не надо', 'жду', 'бросаю вилку в капитана', 'прячусь под стол', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду'],
-  mage: ['кладу нож в сундук', 'подсаживаюсь к меченосцу', 'жду', 'жду', 'жду', 'жгу усы капитану', 'лечу Габа', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду'],
+  mage: ['кладу нож в сундук', 'подсаживаюсь к меченосцу', 'жду', 'жду', 'жду', 'жгу усы капитану', 'лечу Габа', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду'],
   nobby: ['кладу нож в сундук', 'кладу перчатки в сундук', 'жду', 'срезаю кошелёк осторожно', 'швыряю миску молока в капитана', 'бью задиру', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду', 'жду']
 };
 ['gab', 'elf', 'mage', 'nobby'].forEach(function (pc) {
@@ -162,7 +162,9 @@ var SCRIPTS = {
   var r = g.turns[2];
   ok(r.trace.clauses[0].verb === 'steal', 'панель: разбор виден');
   ok(r.rolls.length >= 1 && r.rolls[0].die >= 1 && r.rolls[0].dc === 12, 'панель: бросок с порогом', JSON.stringify(r.rolls[0]));
-  ok(r.diff.some(function (d) { return d.path === 'phase'; }), 'панель: изменение состояния (фаза драки)');
+  ok(r.diff.some(function (d) { return d.path === 'beat'; }), 'панель: изменение состояния (событие «кошелёк»)');
+  g.input('жду');
+  ok(g.turns[3].diff.some(function (d) { return d.path === 'phase'; }), 'панель: драка начинается следующим ходом после кражи (ответ ≤ 1024 знаков)');
   ok(r.rolls.every(function (x) { return x.dmg || (typeof x.mod === 'number' && typeof x.total === 'number'); }), 'панель: у каждого броска есть модификатор и итог');
 })();
 // «шум»: любые слова не роняют движок
@@ -194,15 +196,16 @@ function isRollOk(r) { return r.die === 20 || (r.die !== 1 && r.total >= r.dc); 
 var POOL = ['беру молоко', 'беру кружку', 'пью молоко', 'бью капитана мечом', 'достаю меч из сундука', 'бью задиру', 'бью капитана', 'бросаю вилку в капитана',
   'закрываюсь столом', 'подпираю дверь сундуком', 'беру сундук', 'лечу Габа', 'жгу усы капитану', 'срезаю кошелёк', 'срезаю книгу', 'швыряю миску молока в капитана',
   'прячусь под стол', 'жду', 'жду', 'угощаю всех', 'кладу лук в сундук', 'кладу нож в сундук', 'подсаживаюсь к меченосцу', 'беру стол', 'иду к стойке', 'беру табурет'];
-function fuzz(pcs, seeds, check) {
+function fuzz(pcs, seeds, check, from, pool) {
+  pool = pool || POOL;
   var bad = {};
   pcs.forEach(function (pc) {
-    for (var seed = 1; seed <= seeds; seed++) {
+    for (var seed = from || 1; seed <= seeds; seed++) {
       var g = gameOf(pc, seed * 7 + 3), rnd = seed * 2654435761 >>> 0;
       for (var i = 0; i < 45 && !g.S.ended; i++) {
         rnd = (Math.imul(rnd, 1664525) + 1013904223) >>> 0;
         var before = JSON.stringify(g.S);
-        g.input(POOL[rnd % POOL.length]);
+        g.input(pool[rnd % pool.length]);
         var t = g.turns[g.turns.length - 1];
         check(g, t, bad, pc + '/' + (seed * 7 + 3) + '#' + t.n + ' «' + t.input + '»', JSON.parse(before));
       }
@@ -365,6 +368,72 @@ ALL.forEach(function (pc) {
   var g = toArrest('gab', 11); g.input('бью капитана, потом сдаюсь');
   ok(g.S.f.arrest === 'resist', 'арест: в цепочке решает первое действие', JSON.stringify(g.S.f.arrest));
   var h = toArrest('gab', 11); var hp = h.S.hp.gab; h.input('бью капитана и бью капитана'); ok(h.S.hp.gab === hp - 2, 'арест: здоровье списано один раз за ход', hp + ' → ' + h.S.hp.gab);
+})();
+
+
+// ======================================================================
+// Шаг 1б: формы по полу (находки 15–17) и Эллион по умолчанию ж (Алексей, 30.09)
+// ======================================================================
+(function () {
+  ok(G.HEROES.elf.def === 'f', 'Эллион по умолчанию ж (решение Алексея 30.09)', G.HEROES.elf.def);
+  var BAN = {
+    gab:   { f: [/[Мм]ечник(?![а-я])/, /[Зз]доровяк(?![а-я])/, /[Зз]доровяку/], m: [/[Мм]ечниц/, /здоровячк/] },
+    elf:   { f: [/ушаст(ый|ого)/, /должник/, /[Ээ]льф(а|у|е|ом|ы)?(?![а-яё])/], m: [/эльфийк/, /должниц/, /ушастой/] },
+    mage:  { f: [/тебя видел(?![а-я])/], m: [/тебя видела/] },
+    nobby: { f: [/вора(?![а-я])/, /Вора(?![а-я])/, /воришк[аи]? (?:он|его)/], m: [/воровк/, /Воровк/] }
+  };
+  var bad = [], games = 0;
+  ALL.forEach(function (pc) {
+    for (var mask = 0; mask < 16; mask++) {
+      var gens = {}; ALL.forEach(function (h, i) { gens[h] = (mask >> i) & 1 ? 'f' : 'm'; });
+      [1, 2].forEach(function (seed) {
+        var g = new G({ pc: pc, seed: seed, genders: gens });
+        OPEN[pc].concat(['говорю магу: привет', 'говорю магу: здравствуй', 'говорю магу: как дела', 'говорю габу: привет', 'говорю нобби: привет', 'говорю эльфу: привет']).forEach(function (l) { g.input(l); });
+        for (var i = 0; i < 40 && !g.S.ended; i++) g.input('жду');
+        var tx = g.intro + '\n' + allText(g); games++;
+        ALL.forEach(function (h) {
+          (BAN[h][gens[h]] || []).forEach(function (re) { var m = tx.match(new RegExp('.{0,40}' + re.source + '.{0,30}')); if (m) bad.push(pc + ' ' + JSON.stringify(gens) + ' ' + h + gens[h] + ': …' + m[0] + '…'); });
+        });
+        if (gens[pc] === 'f' && /Ты видел(?![а-я])/.test(tx)) bad.push(pc + ' «Ты видел» вместо «видела» игроку');
+      });
+    }
+  });
+  var uniq = {}; bad.forEach(function (b) { uniq[b.replace(/^.*? (gab|elf|mage|nobby)([mf]): /, '$1$2: ')] = b; });
+  ok(!bad.length, 'формы по полу: ' + games + ' партий (4 героя × 16 комбинаций полов × 2 зерна), нарушений нет', Object.keys(uniq).length + ' разных, например:\n      ' + Object.keys(uniq).slice(0, 6).map(function (k) { return uniq[k]; }).join('\n      '));
+})();
+
+
+// ======================================================================
+// Шаг 1в: длина ответа (находки 2, 3): реплика ≤ 1024 знаков (платформа Алисы)
+// ======================================================================
+(function () {
+  var long = {}, max = 0, turns = 0;
+  var FL = fuzz(ALL, 60, function (g, t, bad, where) {
+    turns++; var n = t.text.join('\n').length; if (n > max) max = n; if (n > 1024) note(bad, 'long', where + ' ' + n);
+  });
+  ok(!FL.long, 'находка 2: ни один ответ из ' + turns + ' ходов не длиннее 1024 знаков (максимум ' + max + ')', firstBad(FL, 'long'));
+  var mx = 0, cnt = 0;
+  ALL.forEach(function (pc) { ['m', 'f'].forEach(function (gd) { for (var seed = 1; seed <= 6; seed++) {
+    var g = new G({ pc: pc, seed: seed, genders: (function () { var o = {}; o[pc] = gd; return o; })() });
+    OPEN[pc].concat(SCRIPTS[pc]).forEach(function (l) { g.input(l); }); for (var i = 0; i < 30 && !g.S.ended; i++) g.input('жду');
+    g.turns.forEach(function (t) { cnt++; mx = Math.max(mx, t.text.join('\n').length); });
+  } }); });
+  ok(mx <= 1024, 'сценарные прогоны (4 героя × 2 пола × 6 зёрен, ' + cnt + ' ходов): ответ ≤ 1024', 'максимум ' + mx);
+  var g2 = gameOf('gab', 4); var long2 = new Array(300).join('беру кружку, иду к стойке, ');
+  g2.input(long2);
+  var len = g2.turns[0].text.join('\n').length;
+  ok(len <= 1024, 'находка 3: ввод в ~8000 знаков — ответ ≤ 1024', len + ' знаков');
+  ok(JSON.stringify(g2.S.queue).length <= 300, 'находка 3: очередь «дальше» в состоянии ≤ 300 знаков', String(JSON.stringify(g2.S.queue).length));
+})();
+
+var POOL2 = ['беру молоко', 'беру кружку', 'пью молоко', 'бью капитана мечом', 'бью задиру', 'бью капитана', 'бросаю вилку в капитана', 'закрываюсь столом', 'подпираю дверь сундуком', 'беру сундук', 'лечу Габа', 'жгу усы капитану', 'срезаю кошелёк', 'швыряю миску молока в капитана', 'прячусь под стол', 'жду', 'жду', 'угощаю всех', 'кладу лук в сундук', 'кладу нож в сундук', 'подсаживаюсь к меченосцу', 'беру стол', 'иду к стойке', 'беру табурет'];
+// 2б: вход стражи — самый длинный абзац серии: если ход уже длинный, стража входит на следующем (зёрна из прогона на 800 партий)
+(function () {
+  var mx = 0, n = 0;
+  var F = fuzz(['elf'], 480, function (g, t, bad, where) { n++; mx = Math.max(mx, t.text.join('\n').length); if (t.text.join('\n').length > 1024) note(bad, 'long', where); }, 474, POOL2);
+  ok(!F.long && n > 0, 'вход стражи после длинного хода (эльф, зёрна 3321–3363): ответ ≤ 1024', 'максимум ' + mx + '; ' + firstBad(F, 'long'));
+  var G2 = fuzz(['elf'], 545, function (g, t, bad, where) { if (t.text.join('\n').length > 1024) note(bad, 'long', where); }, 545, POOL2);
+  ok(!G2.long, 'вход стражи после длинного хода (эльф, зерно 3818)', firstBad(G2, 'long'));
 })();
 
 console.log('\nПроверок: ' + total + ', упало: ' + fails);

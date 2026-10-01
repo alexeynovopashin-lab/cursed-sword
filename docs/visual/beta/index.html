@@ -101,7 +101,12 @@ table.rt th{color:var(--muted);font-weight:400}
 .diff div{padding:1px 0}
 .diff .p{color:var(--muted)}
 .jsonbox{max-height:200px;overflow:auto;background:#0b0908;border:1px solid var(--line);padding:6px;border-radius:6px;white-space:pre-wrap;word-break:break-all}
-@media (max-width:1000px){.stage{grid-template-columns:1fr}.side{display:none}#eng{max-width:100vw;width:100vw;position:fixed;inset:0;z-index:9}}
+@media (max-width:1000px){
+  .stage{display:flex;flex-direction:column;overflow:auto}
+  .story{flex:none;height:calc(100dvh - 120px);min-height:420px;border-right:none}
+  .side{flex:none;overflow:visible;border-top:1px solid var(--line)}
+  #eng{max-width:100vw;width:100vw;position:fixed;inset:0;z-index:9}
+}
 </style>
 </head>
 <body>
@@ -291,7 +296,8 @@ $('form').onsubmit = function(e){
 };
 
 // старт: панель по умолчанию открыта (для анализа), можно скрыть
-if(ls('eng')==='0') document.body.classList.add('noeng'); else document.body.classList.add('dbg');
+// панель движка: на узком экране она закрывает всё, поэтому по умолчанию закрыта (открывается кнопкой, выбор запоминается)
+if(ls('eng')==='1' || (ls('eng')!=='0' && window.innerWidth>1000)) document.body.classList.add('dbg'); else document.body.classList.add('noeng');
 renderStart();
 window.__game = function(){ return game; };
 })();

@@ -50,7 +50,12 @@
   }
   function head(f, skin, extra) { return [E(0, f.hy, f.rx, f.ry, skin || SKIN)].concat(extra || []); }
   function eyes(f, g) { var y = f.hy + f.ry * 0.1, d = f.rx * 0.38; return [E(-d, y, 1.1, 1.3, INK), E(d, y, 1.1, 1.3, INK)]; }
-  function hairCap(f, col, o) { o = o || {}; return E(0, f.hy - 0.25 * f.ry, f.rx * (o.w || 1.08), f.ry * 0.85, col); }
+  function hairCap(f, col, o) { // волосы только над линией лба: дуга сверху, чёлка выше глаз (раньше эллипс закрывал пол-лица, как маска)
+    o = o || {}; var w = (o.w || 1.08) * f.rx, pts = [], a;
+    for (a = 180; a <= 360; a += 15) pts.push([Math.cos(a * Math.PI / 180) * w, f.hy + Math.sin(a * Math.PI / 180) * 1.1 * f.ry]);
+    pts.push([w * 0.97, f.hy - 0.05 * f.ry], [w * 0.7, f.hy - 0.5 * f.ry], [w * 0.3, f.hy - 0.38 * f.ry], [-w * 0.2, f.hy - 0.55 * f.ry], [-w * 0.6, f.hy - 0.42 * f.ry], [-w * 0.97, f.hy - 0.05 * f.ry]);
+    return P(pts, col);
+  }
 
   var BUILD = {
     // Габ / Габриэла, 190: русые волосы, меховой воротник, коричневый плащ, серо-синяя туника, щит за спиной, меч — в сундуке (на фигурке нет)

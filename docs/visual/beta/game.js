@@ -183,6 +183,21 @@
   };
   var SPK_OF = { host: 'host', lizard: 'lizard', guard: 'lizard', rowdy: 'rowdy', gab: 'gab', elf: 'elf', mage: 'mage', nobby: 'nobby' };
 
+  // Спутник не погибает до акта III (Алексей, 1.10, вариант А): «при смерти» — герой выбывает из сцены без сознания и очнётся позже.
+  // Весь урон героям идёт через hurt(); в бете до нуля никто не доходит (арест оставляет ≥ 1), правило — для серий с настоящей дракой.
+  var COMPANION_MAY_DIE = false; // станет true в акте III — отдельным решением
+  Game.prototype.hurt = function (h, n) {
+    var S = this.S; S.hp[h] = Math.max(0, S.hp[h] - n);
+    if (S.hp[h] > 0 || COMPANION_MAY_DIE) return false;
+    S.f.ko = S.f.ko || []; if (S.f.ko.indexOf(h) < 0) S.f.ko.push(h);
+    S.pos[h] = null; this.notes.push(this.gname(h) + ': при смерти — выбывает из сцены, очнётся позже (не гибнет до акта III) — ТЕКСТ нужен');
+    return true;
+  };
+  Game.prototype.wake = function (h) { // очнулся в следующей сцене: 1 здоровья («тяжело ранен»), на своём месте
+    var S = this.S; if (!S.f.ko || S.f.ko.indexOf(h) < 0) return false;
+    S.f.ko = S.f.ko.filter(function (x) { return x !== h; }); if (!S.f.ko.length) delete S.f.ko;
+    S.hp[h] = Math.max(1, S.hp[h]); S.pos[h] = h === S.pc ? S.at : (h === 'gab' ? 'corner' : 'hall'); return true;
+  };
   // rolls.md §2: единица и двадцатка не пустые. Слов Диалогов для них нет — эффект в состоянии и в панели («ТЕКСТ нужен»).
   Game.prototype.fx = function (r, kind) {
     var S = this.S; if (!r || r.forced || r.auto || (!r.crit && !r.fumble)) return;
@@ -224,7 +239,9 @@
 
     if (S.ended) { this.say('Серия закончилась. Можно откатиться на любой ход или начать заново.'); return this.finish(rec, before, true); }
 
-    if (p.meta) {
+    if (S.f.ko && S.f.ko.indexOf(S.pc) >= 0 && !S.ended) { // герой игрока без сознания: сцена идёт без него
+      this.spend(1); this.say(NOTEXT + 'Ты без сознания. Сцена идёт без тебя.');
+    } else if (p.meta) {
       this.meta(p.meta, rec);
     } else if (!p.clauses.length) {
       this.say(this.pick(['Ты молчишь, и таверна молчит в ответ. (Напиши, что делаешь.)', 'Пустая строка — не действие. Напиши, что делаешь: «беру кружку», «иду к стойке».']));
@@ -1473,7 +1490,7 @@
     this.arrestLine(hero, kind, how, A, c);
     if (kind === 'resist') { // rolls.md §5, вопрос 3А (рабочий вариант, обратимо): контакт — «ранен» (Габ −5, остальные −3); бросок предмета −2; упор −1
       var cost = (how === 'strike' || how === 'spark') ? (hero === 'gab' ? 5 : 3) : how === 'throw' ? 2 : 1;
-      S.hp[hero] = Math.max(1, S.hp[hero] - cost); S.f.team.dec[hero].cost = cost;
+      this.hurt(hero, Math.min(cost, S.hp[hero] - 1)); S.f.team.dec[hero].cost = cost; // минимум 1 здоровья (rolls.md §5)
       if (cost >= 3) this.notes.push(this.gname(hero) + ': ранен (−' + cost + ') — слово «ранен» для камеры: ТЕКСТ нужен');
     }
     var left = team.order.filter(function (h) { return !team.dec[h]; });
@@ -1549,7 +1566,7 @@
   Game.prototype.viewState = function () {
     var S = this.S, w = S.w, self = this;
     var figs = [];
-    ORDER.forEach(function (h) { figs.push({ id: h, name: self.gname(h), place: h === S.pc ? S.at : S.pos[h], pc: h === S.pc, color: HEROES[h].color, hp: S.hp[h], hpMax: HEROES[h].hp }); });
+    ORDER.forEach(function (h) { if (S.f.ko && S.f.ko.indexOf(h) >= 0) return; figs.push({ id: h, name: self.gname(h), place: h === S.pc ? S.at : S.pos[h], pc: h === S.pc, color: HEROES[h].color, hp: S.hp[h], hpMax: HEROES[h].hp }); });
     ['host', 'lizard', 'rowdy'].forEach(function (id) { if (S.pos[id] && !(id === 'rowdy' && w.rowdy.gone)) figs.push({ id: id, name: NAMES[id], place: S.pos[id], color: id === 'lizard' ? '#c9a45c' : id === 'host' ? '#9a8b72' : '#8a4a4a', hp: id === 'lizard' ? w.lizard.hp : id === 'rowdy' ? w.rowdy.hp : null }); });
     if (w.guards) figs.push({ id: 'guard', name: 'стража', place: 'door', color: '#5a6a7a' });
     return { figs: figs, at: S.at, phase: S.phase, inv: S.inv.slice(), held: S.held, mana: S.pc === 'mage' ? S.mana : null, hp: S.hp[S.pc], hpMax: HEROES[S.pc].hp, ended: S.ended, weaponIn: S.weaponIn, door: w.door, stools: w.stools, mugs: w.mugs, chestHas: w.chest.has };

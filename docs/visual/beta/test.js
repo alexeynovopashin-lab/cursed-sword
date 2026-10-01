@@ -617,7 +617,7 @@ ok(CS.parse('фуфлыжник табуретом').unknown.indexOf('фуфлы
   ok(!bad.length && n > 100, '3.2: ни одной заглушки [ТЕКСТ] и скобки-подсказки в ответах (' + n + ' фраз × 4 героя × вечер/драка)', bad.slice(0, 3).join(' || '));
   ok(draft > 50, '3.2: ответы по строкам Диалогов помечены «черновик» в записи хода', draft + ' из ' + n);
   var src = require('fs').readFileSync(__dirname + '/game.js', 'utf8');
-  ok(!/STUB/.test(src) && (src.match(/NOTEXT \+/g) || []).length <= 3, '3.2: в game.js нет STUB; метка [ТЕКСТ] — только у новых случаев без слов (≤3)');
+  ok(!/STUB/.test(src) && (src.match(/NOTEXT \+/g) || []).length <= 4, '3.2: в game.js нет STUB; метка [ТЕКСТ] — только у новых случаев без слов (≤4)');
   ok(!/\(Три действия|\(Кошелёк/.test(src), '3.2: в game.js нет подсказок в скобках');
   // пределы: полная ≤140, короткая ≤60 — для 16 сочетаний полов, 4 героев игрока, слова «X» в 20 знаков
   var over = [], cnt = 0, REF = CS.REF;
@@ -776,6 +776,27 @@ function notesOf(g) { return g.turns[g.turns.length - 1].notes.join(' | '); }
   fuzz(ALL, 60, function (g2) { var b = g2.stateBytes(); mx = Math.max(mx, b.scene); mxs = Math.max(mxs, b.season); });
   var BASE = { gab: 935, elf: 936, mage: 939, nobby: 942 }; // старт на 05791fc, замер сцены без сезона
   ok(ALL.every(function (k) { return start[k] <= BASE[k]; }) && mx <= 1386 && mxs <= 200, '3.4: состояние не растёт: сцена на старте не больше, чем на 05791fc (935–942 Б), максимум ≤ 1386 Б; сезон ≤ 200 Б', JSON.stringify(start) + ' макс ' + mx + ' сезон ' + mxs);
+})();
+
+// ======================================================================
+// Шаг 3.5: спутник не погибает до акта III — при «смерти» выбывает из сцены, очнётся позже (Алексей, 1.10, А)
+// ======================================================================
+(function () {
+  var g = gameOf('gab', 5); advance(g, 'brawl'); var died = g.hurt('elf', 99);
+  ok(died && g.S.hp.elf === 0 && g.S.f.ko.indexOf('elf') >= 0 && g.S.pos.elf === null && !g.S.ended, '3.5: Эллион доведена до нуля — выбывает из сцены (ko), сцена идёт, серия не кончилась', JSON.stringify(g.S.f.ko));
+  ok(!/dead|мёртв|погиб/i.test(JSON.stringify(g.S)) && g.viewState().figs.every(function (f) { return f.id !== 'elf'; }), '3.5: в состоянии нет «погиб/мёртв», на карте фигурки нет');
+  ok(g.wake('elf') && g.S.hp.elf === 1 && !g.S.f.ko && g.S.pos.elf === 'hall', '3.5: очнулась: здоровье 1 («тяжело ранен»), на месте, метка ko снята', JSON.stringify(g.S.hp));
+  ok(!g.wake('elf'), '3.5: очнуться можно только раз');
+  // герой игрока без сознания: ход идёт, серия доходит до конца
+  var p = gameOf('nobby', 5); OPEN.nobby.forEach(function (l) { p.input(l); }); p.hurt('nobby', 99); p.input('бью капитана');
+  ok(/без сознания/.test(lastText(p)) && p.S.turn >= 2, '3.5: герой игрока без сознания — «сцена идёт без тебя», ход проходит', lastText(p));
+  for (var i = 0; i < 30 && !p.S.ended; i++) p.input('жду'); ok(p.S.ended, '3.5: серия с выбывшим героем игрока всё равно доходит до конца');
+  // арест: минимум 1 здоровья, не ko
+  var a = toArrest('nobby', 11); a.S.hp.nobby = 2; a.input('бью стражника'); ok(a.S.hp.nobby === 1 && !a.S.f.ko, '3.5: контакт при 2 здоровья — остаётся 1, не выбывает (rolls.md §5)', a.S.hp.nobby);
+  // во всех партиях: здоровье ≥ 1, кроме выбывших
+  var viol = 0, n = 0;
+  fuzz(ALL, 60, function (g2) { n++; ALL.forEach(function (h) { if (g2.S.hp[h] < 1 && !(g2.S.f.ko && g2.S.f.ko.indexOf(h) >= 0)) viol++; if (g2.S.hp[h] < 0) viol++; }); });
+  ok(viol === 0 && n > 1000, '3.5: ' + n + ' ходов в случайных партиях: ни у кого здоровья ниже 1 без метки ko', String(viol));
 })();
 
 console.log('\nПроверок: ' + total + ', упало: ' + fails);

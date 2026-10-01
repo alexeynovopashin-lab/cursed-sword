@@ -173,3 +173,54 @@ bad6 = sorted({f"стр. {it['line']}" for it, sp, t in alltexts for g in combos
 dig = sorted({f"стр. {it['line']}" for it, sp, t in alltexts if re.search(r'\d', render(t, DEFAULT))})
 print(f'== Слова о мечнице, отменённые Алексеем 1.10 (силачка, здоровячка, великанша, громила): {len(bad6)} {bad6}')
 print(f'== Цифры в тексте озвучки: {len(dig)} {dig}')
+
+# ---- 7. шаг 6: подсказки для вычитки на слух (кандидаты, не приговор) ----------
+# (4) один корень в соседних предложениях — по тексту, как его слышит колонка: имена говорящих
+# тоже звучат («Лизард берёт… Лизард: …»). Корень грубо: слово без последней буквы, до 5 знаков;
+# совпадение — если одна основа начинается с другой (≥3 букв). Ловит и ложные пары — смотреть глазами.
+# (2) «ты» и «вы» в реплике одного говорящего — ведущий законно говорит столу «вы», игроку «ты»,
+# поэтому это тоже список для глаза.
+STOPW = set('тебя тебе тобой твой твоя твоё твои твоего твоём твоему вами ваша ваше ваши вашего вашей '
+            'него неё ними этот эта это этого этой того тому только уже ещё будто чтобы когда потом даже '
+            'тоже очень здесь тут там всех всем всё весь вся свой своё свои себя себе есть было были '
+            'если или что как так где кто сам сама один одна снова теперь'.split())
+def stems(s):
+    out = set()
+    for w in W(s.lower()):
+        if len(w) >= 4 and w not in STOPW:
+            out.add(w[:-1][:5])
+    return out
+def near(a, b):
+    return [x for x in a for y in b if len(min(x, y, key=len)) >= 3 and (x.startswith(y) or y.startswith(x))]
+def spoken(segs, g):
+    seq = []
+    for sp, t in segs:
+        lab = label(sp, g)
+        ss = SENT(render(t, g))
+        if lab and ss:
+            ss[0] = lab + ' ' + ss[0]
+        seq += ss
+    return seq
+rep4 = set()
+for it in items + [it for a in answers for it in a['items']]:
+    seq = spoken(it['segs'], DEFAULT)
+    for a, b in zip(seq, seq[1:]):
+        hit = near(stems(a), stems(b))
+        if hit:
+            rep4.add(f"стр. {it['line']}: {sorted(set(hit))} «…{a[-40:]} | {b[:40]}…»")
+for a in answers:  # стыки между пунктами одного ответа
+    its = [it for it in a['items'] if it['segs']]
+    for x, y in zip(its, its[1:]):
+        sa, sb = spoken(x['segs'], DEFAULT), spoken(y['segs'], DEFAULT)
+        if sa and sb:
+            hit = near(stems(sa[-1]), stems(sb[0]))
+            if hit:
+                rep4.add(f"ответ {a['id']} (стык стр. {x['line']}→{y['line']}): {sorted(set(hit))} «…{sa[-1][-40:]} | {sb[0][:40]}…»")
+TY = re.compile(r'\b(ты|тебя|тебе|тобой|твой|твоя|твоё|твои|твоего|твоём|твоему)\b', re.I)
+VY = re.compile(r'\b(вы|вас|вам|вами|ваш|ваша|ваше|ваши|вашего|вашей)\b', re.I)
+mix = sorted({f"стр. {it['line']} ({sp})" for it, sp, t in alltexts
+              if TY.search(render(t, DEFAULT)) and VY.search(render(t, DEFAULT))})
+print(f'== Вычитка, кандидаты (4) «корень в соседних предложениях»: {len(rep4)}')
+for h in sorted(rep4):
+    print('     ', h)
+print(f'== Вычитка, кандидаты (2) «ты» и «вы» в реплике одного говорящего: {len(mix)} {mix}')
